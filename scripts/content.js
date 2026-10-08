@@ -226,8 +226,9 @@
     btn.className = 'ytp-button';
     btn.title = 'Watch Marker';
     btn.setAttribute('aria-label', 'Watch Marker');
+
+    // Keep size inline with YouTube's player buttons without forcing display block
     btn.style.cssText = `
-      display: inline-block;
       width: 36px;
       height: 36px;
       padding: 0;
@@ -236,6 +237,7 @@
       border: none;
       cursor: pointer;
       vertical-align: middle;
+      transition: opacity 0.1s cubic-bezier(0,0,0.2,1);
     `;
 
     btn.innerHTML = `
@@ -260,6 +262,20 @@
       cardsContainer.insertBefore(btn, infoBtn);
     } else {
       cardsContainer.appendChild(btn);
+    }
+
+    // Ensure style rule exists to hide button when YouTube hides player controls
+    if (!document.getElementById('ytwm-style')) {
+      const style = document.createElement('style');
+      style.id = 'ytwm-style';
+      style.textContent = `
+        .ytp-autohide #ytwm-player-btn,
+        .ytp-user-idle #ytwm-player-btn {
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+      `;
+      document.head.appendChild(style);
     }
   }
 
