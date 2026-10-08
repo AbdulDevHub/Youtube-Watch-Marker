@@ -18,13 +18,15 @@
   }
 
   const describe = (mark) =>
-    !mark ? 'Not marked' : mark.s === 'w' ? '✓ Watched' : `⏱ ${fmt(mark.t)}`;
+    !mark ? 'Not Marked' : mark.s === 'w' ? '✓ Watched' : `⏱ Watched Till ${fmt(mark.t)}`;
 
   const say = (text) => { $('msg').textContent = text; };
 
   function paint() {
     $('state').textContent = describe(current);
-    $('clear').disabled = !current;
+
+    // Hide "Clear" if there's no mark saved yet
+    $('clear').style.display = current ? 'block' : 'none';
 
     // Hide "Mark as watched" button if already marked as watched
     $('watched').style.display = current?.s === 'w' ? 'none' : 'block';
