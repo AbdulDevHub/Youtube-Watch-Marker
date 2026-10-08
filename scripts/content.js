@@ -12,6 +12,7 @@
   const marks = new Map();
   let timer = null;
   let dirty = false; // true if we've injected badges that need cleanup when leaving /videos
+  let activeMenu = null;
 
   function fmt(total) {
     const s = Math.max(0, Math.floor(total));
@@ -25,6 +26,16 @@
 
   function badgeText(mark) {
     return mark.s === 'w' ? '✓ Watched' : `⏱ ${fmt(mark.t)}`;
+  }
+
+  function getCurrentVideoId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('v');
+  }
+
+  function getCurrentVideoTime() {
+    const video = document.querySelector('video');
+    return video ? Math.floor(video.currentTime) : 0;
   }
 
   function videoIdOf(card) {
@@ -78,8 +89,181 @@
     dirty = true;
   }
 
+  function closeMenu() {
+    if (activeMenu) {
+      activeMenu.remove();
+      activeMenu = null;
+    }
+  }
+
+  function createMenu() {
+    closeMenu();
+
+    const videoId = getCurrentVideoId();
+    if (!videoId) return;
+
+    const currentMark = marks.get(videoId);
+    const playerContainer = document.querySelector('#movie_player') || document.body;
+
+    const menu = document.createElement('div');
+    menu.id = 'ytwm-inline-menu';
+    Object.assign(menu.style, {
+      position: 'absolute',
+      top: '52px',
+      right: '16px',
+      width: '165px',
+      padding: '8px',
+      borderRadius: '8px',
+      background: 'rgba(24, 24, 24, 0.95)',
+      backdropFilter: 'blur(8px)',
+      border: '1px solid rgba(255, 255, 255, 0.12)',
+      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
+      color: '#fff',
+      fontFamily: 'Roboto, Arial, sans-serif',
+      fontSize: '12px',
+      zIndex: '999999999',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '5px',
+    });
+
+    const statusText = currentMark ? badgeText(currentMark) : 'Not Marked';
+
+    const clearBtnHtml = currentMark
+      ? `<button id="ytwm-action-clear" style="
+          background: rgba(255, 85, 85, 0.15);
+          border: none;
+          color: #ff6b6b;
+          padding: 6px 8px;
+          border-radius: 5px;
+          cursor: pointer;
+          text-align: left;
+          font-size: 12px;
+        ">
+          ✕ Clear Mark
+        </button>`
+      : '';
+
+    menu.innerHTML = `
+      <div style="font-weight: 600; font-size: 11px; color: #888; padding: 2px 4px;">
+        ${statusText}
+      </div>
+      <button id="ytwm-action-watched" style="
+        background: rgba(255,255,255,0.08);
+        border: none;
+        color: #fff;
+        padding: 6px 8px;
+        border-radius: 5px;
+        cursor: pointer;
+        text-align: left;
+        font-size: 12px;
+      ">
+        ✓ ${currentMark && currentMark.s === 'w' ? 'Unmark Watched' : 'Mark Watched'}
+      </button>
+      <button id="ytwm-action-timestamp" style="
+        background: rgba(255,255,255,0.08);
+        border: none;
+        color: #fff;
+        padding: 6px 8px;
+        border-radius: 5px;
+        cursor: pointer;
+        text-align: left;
+        font-size: 12px;
+      ">
+        ⏱ Save Timestamp
+      </button>
+      ${clearBtnHtml}
+    `;
+
+    menu.querySelector('#ytwm-action-watched').addEventListener('click', () => {
+      const key = `${PREFIX}${videoId}`;
+      if (currentMark && currentMark.s === 'w') {
+        chrome.storage.local.remove(key);
+      } else {
+        chrome.storage.local.set({ [key]: { s: 'w' } });
+      }
+      closeMenu();
+    });
+
+    menu.querySelector('#ytwm-action-timestamp').addEventListener('click', () => {
+      const t = getCurrentVideoTime();
+      const key = `${PREFIX}${videoId}`;
+      chrome.storage.local.set({ [key]: { s: 't', t } });
+      closeMenu();
+    });
+
+    const clearBtn = menu.querySelector('#ytwm-action-clear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        const key = `${PREFIX}${videoId}`;
+        chrome.storage.local.remove(key);
+        closeMenu();
+      });
+    }
+
+    playerContainer.appendChild(menu);
+    activeMenu = menu;
+  }
+
+  document.addEventListener('click', (e) => {
+    if (activeMenu && !activeMenu.contains(e.target) && !e.target.closest('#ytwm-player-btn')) {
+      closeMenu();
+    }
+  });
+
+  function injectPlayerButton() {
+    if (!window.location.href.includes('/watch')) return;
+    if (document.getElementById('ytwm-player-btn')) return;
+
+    const cardsContainer = document.querySelector('.ytp-chrome-top-buttons');
+    if (!cardsContainer) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'ytwm-player-btn';
+    btn.className = 'ytp-button';
+    btn.title = 'Watch Marker';
+    btn.setAttribute('aria-label', 'Watch Marker');
+    btn.style.cssText = `
+      display: inline-block;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      margin: 0;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      vertical-align: middle;
+    `;
+
+    btn.innerHTML = `
+      <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
+        <path class="ytp-svg-shadow" d="M18,8 C12.47,8 8,12.47 8,18 8,23.52 12.47,28 18,28 23.52,28 28,23.52 28,18 28,12.47 23.52,8 18,8 Z m-1,15 l-5-5 1.41-1.41 L17,20.17 l7.59-7.59 L26,14 l-9,9 z"></path>
+        <path class="ytp-svg-fill" d="M 18,8 C 12.47,8 8,12.47 8,18 8,23.52 12.47,28 18,28 23.52,28 28,23.52 28,18 28,12.47 23.52,8 18,8 z m -1,15 -5,-5 1.41,-1.41 L 17,20.17 24.59,12.58 26,14 z" fill="#ffffff"></path>
+      </svg>
+    `;
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (activeMenu) {
+        closeMenu();
+      } else {
+        createMenu();
+      }
+    });
+
+    const infoBtn = cardsContainer.querySelector('.ytp-cards-button');
+    if (infoBtn) {
+      cardsContainer.insertBefore(btn, infoBtn);
+    } else {
+      cardsContainer.appendChild(btn);
+    }
+  }
+
   function scan() {
     timer = null;
+    injectPlayerButton();
+
     if (!onVideosTab()) {
       if (dirty) {
         document.querySelectorAll('[data-ytwm], [data-ytwm-sep]').forEach((n) => n.remove());
@@ -91,7 +275,7 @@
   }
 
   function schedule() {
-    if (timer === null) timer = setTimeout(scan, 120);
+    if (timer === null) timer = setTimeout(scan, 100);
   }
 
   // Initial load of all saved marks.
@@ -119,5 +303,10 @@
     childList: true,
     subtree: true,
   });
-  document.addEventListener('yt-navigate-finish', schedule);
+
+  document.addEventListener('yt-navigate-finish', () => {
+    closeMenu();
+    schedule();
+  });
+  document.addEventListener('DOMContentLoaded', schedule);
 })();
