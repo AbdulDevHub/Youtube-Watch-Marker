@@ -114,7 +114,7 @@
       $('file').click();
     } else {
       // The file picker closes the popup in Chrome, so import runs in a full tab.
-      chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?import=1') });
+      chrome.tabs.create({ url: chrome.runtime.getURL('popup/popup.html?import=1') });
     }
   }
 
