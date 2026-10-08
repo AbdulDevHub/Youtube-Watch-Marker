@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>YouTube Watch Marker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <section id="mark">
+      <p id="state" class="state"></p>
+      <div id="actions">
+        <button id="watched" type="button">Mark as watched</button>
+        <button id="timestamp" type="button">Save timestamp</button>
+        <button id="clear" type="button">Clear this video's history</button>
+      </div>
+      <p id="hint" class="hint" hidden>Open a video to mark it</p>
+    </section>
+
+    <p id="msg" class="msg" role="status" aria-live="polite"></p>
+
+    <footer>
+      <button id="export" type="button" class="link">Export</button>
+      <button id="import" type="button" class="link">Import</button>
+      <input id="file" type="file" accept="application/json,.json" hidden>
+    </footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
