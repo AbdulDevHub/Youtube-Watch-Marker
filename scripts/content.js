@@ -25,7 +25,7 @@
   const onVideosTab = () => /\/videos\/?$/.test(location.pathname);
 
   function badgeText(mark) {
-    return mark.s === 'w' ? '✓ Watched' : `⏱ ${fmt(mark.t)}`;
+    return mark.s === 'w' ? '✓ Watched' : `⏱ Watched Till ${fmt(mark.t)}`;
   }
 
   function getCurrentVideoId() {
@@ -111,7 +111,7 @@
       position: 'absolute',
       top: '52px',
       right: '16px',
-      width: '165px',
+      width: 'max-content',
       padding: '8px',
       borderRadius: '8px',
       background: 'rgba(24, 24, 24, 0.95)',
@@ -139,13 +139,14 @@
           cursor: pointer;
           text-align: left;
           font-size: 12px;
+          white-space: nowrap;
         ">
           ✕ Clear Mark
         </button>`
       : '';
 
     menu.innerHTML = `
-      <div style="font-weight: 600; font-size: 11px; color: #888; padding: 2px 4px;">
+      <div style="font-weight: 600; font-size: 11px; color: #888; padding: 2px 4px; white-space: nowrap;">
         ${statusText}
       </div>
       <button id="ytwm-action-watched" style="
@@ -157,6 +158,7 @@
         cursor: pointer;
         text-align: left;
         font-size: 12px;
+        white-space: nowrap;
       ">
         ✓ ${currentMark && currentMark.s === 'w' ? 'Unmark Watched' : 'Mark Watched'}
       </button>
@@ -169,6 +171,7 @@
         cursor: pointer;
         text-align: left;
         font-size: 12px;
+        white-space: nowrap;
       ">
         ⏱ Save Timestamp
       </button>
