@@ -25,6 +25,9 @@
   function paint() {
     $('state').textContent = describe(current);
     $('clear').disabled = !current;
+
+    // Hide "Mark as watched" button if already marked as watched
+    $('watched').style.display = current?.s === 'w' ? 'none' : 'block';
   }
 
   async function load() {
@@ -128,7 +131,7 @@
 
     if (tabMode) {
       document.body.classList.add('tab');
-      $('mark').hidden = true;
+      $('mark').style.display = 'none';
       say('Choose a JSON file from a previous export. Imported marks overwrite matching videos.');
       return;
     }
@@ -141,8 +144,8 @@
     } catch { /* no usable URL */ }
 
     if (!id) {
-      $('state').hidden = true;
-      $('actions').hidden = true;
+      $('state').style.display = 'none';
+      $('actions').style.display = 'none';
       $('hint').hidden = false;
       return;
     }
