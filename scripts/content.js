@@ -1,43 +1,29 @@
-// Adds "✓ Watched" / "⏱ m:ss" badges to the views/date row of video cards
-// on a channel's /videos tab. Marks live in chrome.storage.local under "v:<videoId>".
+// Adds "✓ Watched" / "⏱ m:ss" badges to the views/date row of video cards on a
+// channel's /videos tab, and an in-player menu on watch pages for marking videos.
+// Depends on scripts/shared.js (global YTWM).
 (() => {
   'use strict';
 
-  const PREFIX = 'v:';
+  const { PREFIX, label, describe, ACTIONS, icon, loadAll, readPlayerTime, applyAction } = YTWM;
+
   const CARD_SEL = 'yt-lockup-view-model, ytd-grid-video-renderer, ytd-rich-grid-media';
   const ROW_SEL = '.ytContentMetadataViewModelMetadataRow, #metadata-line';
   const TEXT_SEL = '.ytContentMetadataViewModelMetadataText, span.inline-metadata-item';
   const DELIM_SEL = '.ytContentMetadataViewModelDelimiter';
+  const BADGE_SEL = '[data-ytwm], [data-ytwm-sep]';
+
+  const BTN_ID = 'ytwm-player-btn';
+  const FLASH_MS = 1800;
 
   const marks = new Map();
   let timer = null;
-  let dirty = false; // true if we've injected badges that need cleanup when leaving /videos
-  let activeMenu = null;
-
-  function fmt(total) {
-    const s = Math.max(0, Math.floor(total));
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = String(s % 60).padStart(2, '0');
-    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
-  }
+  let dirty = false; // true if badges were injected and need cleanup when leaving /videos
+  let menu = null;   // { el, id, status, flash, hint, flashTimer } while the player menu is open
 
   const onVideosTab = () => /\/videos\/?$/.test(location.pathname);
+  const currentVideoId = () => new URLSearchParams(location.search).get('v');
 
-  function badgeText(mark) {
-    return mark.s === 'w' ? '✓ Watched' : `⏱ Watched Till ${fmt(mark.t)}`;
-  }
-
-  function getCurrentVideoId() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('v');
-  }
-
-  function getCurrentVideoTime() {
-    const video = document.querySelector('video');
-    return video ? Math.floor(video.currentTime) : 0;
-  }
-
+  // ---- badges on the Videos tab ------------------------------------------
   function videoIdOf(card) {
     const a = card.querySelector('a[href*="/watch?v="]');
     if (!a) return null;
@@ -48,9 +34,7 @@
     }
   }
 
-  function clearRow(row) {
-    row.querySelectorAll('[data-ytwm], [data-ytwm-sep]').forEach((n) => n.remove());
-  }
+  const clearBadges = (root) => root.querySelectorAll(BADGE_SEL).forEach((n) => n.remove());
 
   function render(card) {
     const rows = card.querySelectorAll(ROW_SEL);
@@ -59,13 +43,13 @@
 
     const id = videoIdOf(card);
     const mark = id ? marks.get(id) : null;
-    const want = mark ? badgeText(mark) : null;
+    const want = mark ? label(mark) : null;
 
     const existing = row.querySelector('[data-ytwm]');
     if (existing && existing.dataset.ytwm === want) return; // already correct
     if (!existing && !want) return;
 
-    clearRow(row);
+    clearBadges(row);
     if (!want) return;
 
     const texts = row.querySelectorAll(TEXT_SEL);
@@ -89,203 +73,185 @@
     dirty = true;
   }
 
+  // ---- player menu -------------------------------------------------------
+  const STYLES = `
+    #${BTN_ID} {
+      width: 36px; height: 36px; padding: 0; margin: 0;
+      border: 0; background: transparent; cursor: pointer; vertical-align: middle;
+      opacity: 0.75; transition: opacity 0.1s cubic-bezier(0, 0, 0.2, 1);
+    }
+    #${BTN_ID}:hover,
+    #movie_player:has(.ytwm-menu) #${BTN_ID} { opacity: 1; }
+    #${BTN_ID} svg { display: block; width: 100%; height: 100%; }
+
+    /* Hide with the rest of the player controls, except while the menu is open. */
+    .ytp-autohide:not(:has(.ytwm-menu)) #${BTN_ID},
+    .ytp-user-idle:not(:has(.ytwm-menu)) #${BTN_ID} { opacity: 0 !important; pointer-events: none !important; }
+    #movie_player:has(.ytwm-menu) .ytp-chrome-top { opacity: 1 !important; visibility: visible !important; }
+
+    .ytwm-menu {
+      position: absolute; top: 52px; right: 16px; z-index: 999999999;
+      display: flex; flex-direction: column; gap: 8px;
+      width: 192px; padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px;
+      background: rgba(28, 28, 28, 0.92); backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      color: #fff; font: 500 12px/1.3 Roboto, Arial, sans-serif;
+      cursor: default; user-select: none;
+      animation: ytwm-pop 0.12s ease-out;
+    }
+    @keyframes ytwm-pop { from { opacity: 0; transform: translateY(-4px); } }
+    @media (prefers-reduced-motion: reduce) { .ytwm-menu { animation: none; } }
+
+    .ytwm-status { min-height: 1.3em; padding: 0 2px; color: rgba(255, 255, 255, 0.72); }
+    .ytwm-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .ytwm-act {
+      display: grid; place-items: center; height: 40px; padding: 0;
+      border: 0; border-radius: 10px; cursor: pointer;
+      background: rgba(255, 255, 255, 0.1); color: #fff;
+      transition: background 0.12s, color 0.12s;
+    }
+    .ytwm-act svg { width: 20px; height: 20px; }
+    .ytwm-act:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+    .ytwm-act.ytwm-on { background: #fff; color: #0f0f0f; }
+    .ytwm-act.ytwm-danger { color: #ff7b7b; }
+    .ytwm-act.ytwm-danger:hover:not(:disabled) { background: rgba(255, 90, 90, 0.22); }
+    .ytwm-act:disabled { opacity: 0.35; cursor: default; }
+    .ytwm-act:focus-visible { outline: 2px solid #3ea6ff; outline-offset: 2px; }
+  `;
+
+  function injectStyles() {
+    if (document.getElementById('ytwm-style')) return;
+    const style = document.createElement('style');
+    style.id = 'ytwm-style';
+    style.textContent = STYLES;
+    document.head.appendChild(style);
+  }
+
   function closeMenu() {
-    if (activeMenu) {
-      activeMenu.remove();
-      activeMenu = null;
+    if (!menu) return;
+    clearTimeout(menu.flashTimer);
+    menu.el.remove();
+    menu = null;
+  }
+
+  function paintMenu() {
+    if (!menu) return;
+    const mark = marks.get(menu.id) || null;
+    menu.status.textContent = menu.flash ?? menu.hint ?? describe(mark);
+    menu.el.querySelectorAll('.ytwm-act').forEach((b) => {
+      b.classList.toggle('ytwm-on', mark?.s === b.dataset.act); // 'w' / 't' match mark.s
+      if (b.dataset.act === 'clear') b.disabled = !mark;
+    });
+  }
+
+  function flashMessage(text) {
+    clearTimeout(menu.flashTimer);
+    menu.flash = text;
+    menu.flashTimer = setTimeout(() => {
+      if (!menu) return;
+      menu.flash = null;
+      paintMenu();
+    }, FLASH_MS);
+  }
+
+  async function runAction(actionId) {
+    const id = menu.id;
+    const result = await applyAction(actionId, id, async () => readPlayerTime());
+    if (result.changed) {
+      if (result.mark) marks.set(id, result.mark);
+      else marks.delete(id);
+      schedule();
+    }
+    if (menu?.id === id) {
+      flashMessage(result.message);
+      paintMenu();
     }
   }
 
   function createMenu() {
     closeMenu();
+    const id = currentVideoId();
+    if (!id) return;
 
-    const videoId = getCurrentVideoId();
-    if (!videoId) return;
+    const el = document.createElement('div');
+    el.className = 'ytwm-menu';
+    el.innerHTML = `
+      <div class="ytwm-status" role="status" aria-live="polite"></div>
+      <div class="ytwm-actions">
+        ${ACTIONS.map((a) => `
+          <button type="button" class="ytwm-act${a.danger ? ' ytwm-danger' : ''}"
+                  data-act="${a.id}" title="${a.label}" aria-label="${a.label}">${icon(a.icon)}</button>`).join('')}
+      </div>`;
 
-    const currentMark = marks.get(videoId);
-    const playerContainer = document.querySelector('#movie_player') || document.body;
+    menu = { el, id, status: el.querySelector('.ytwm-status'), flash: null, hint: null, flashTimer: null };
 
-    const menu = document.createElement('div');
-    menu.id = 'ytwm-inline-menu';
-    Object.assign(menu.style, {
-      position: 'absolute',
-      top: '52px',
-      right: '16px',
-      width: 'max-content',
-      padding: '8px',
-      borderRadius: '8px',
-      background: 'rgba(24, 24, 24, 0.95)',
-      backdropFilter: 'blur(8px)',
-      border: '1px solid rgba(255, 255, 255, 0.12)',
-      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
-      color: '#fff',
-      fontFamily: 'Roboto, Arial, sans-serif',
-      fontSize: '12px',
-      zIndex: '999999999',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '5px',
+    const actions = el.querySelector('.ytwm-actions');
+    actions.addEventListener('click', (e) => {
+      const b = e.target.closest('.ytwm-act');
+      if (b && !b.disabled) runAction(b.dataset.act);
     });
-
-    const statusText = currentMark ? badgeText(currentMark) : 'Not Marked';
-
-    const clearBtnHtml = currentMark
-      ? `<button id="ytwm-action-clear" style="
-          background: rgba(255, 85, 85, 0.15);
-          border: none;
-          color: #ff6b6b;
-          padding: 6px 8px;
-          border-radius: 5px;
-          cursor: pointer;
-          text-align: left;
-          font-size: 12px;
-          white-space: nowrap;
-        ">
-          ✕ Clear Mark
-        </button>`
-      : '';
-
-    menu.innerHTML = `
-      <div style="font-weight: 600; font-size: 11px; color: #888; padding: 2px 4px; white-space: nowrap;">
-        ${statusText}
-      </div>
-      <button id="ytwm-action-watched" style="
-        background: rgba(255,255,255,0.08);
-        border: none;
-        color: #fff;
-        padding: 6px 8px;
-        border-radius: 5px;
-        cursor: pointer;
-        text-align: left;
-        font-size: 12px;
-        white-space: nowrap;
-      ">
-        ✓ ${currentMark && currentMark.s === 'w' ? 'Unmark Watched' : 'Mark Watched'}
-      </button>
-      <button id="ytwm-action-timestamp" style="
-        background: rgba(255,255,255,0.08);
-        border: none;
-        color: #fff;
-        padding: 6px 8px;
-        border-radius: 5px;
-        cursor: pointer;
-        text-align: left;
-        font-size: 12px;
-        white-space: nowrap;
-      ">
-        ⏱ Save Timestamp
-      </button>
-      ${clearBtnHtml}
-    `;
-
-    menu.querySelector('#ytwm-action-watched').addEventListener('click', () => {
-      const key = `${PREFIX}${videoId}`;
-      if (currentMark && currentMark.s === 'w') {
-        chrome.storage.local.remove(key);
-      } else {
-        chrome.storage.local.set({ [key]: { s: 'w' } });
-      }
-      closeMenu();
+    // Show the hovered button's name in the status line.
+    actions.addEventListener('mouseover', (e) => {
+      const b = e.target.closest('.ytwm-act');
+      if (b && !b.disabled) { menu.hint = b.title; paintMenu(); }
     });
+    actions.addEventListener('mouseleave', () => { menu.hint = null; paintMenu(); });
 
-    menu.querySelector('#ytwm-action-timestamp').addEventListener('click', () => {
-      const t = getCurrentVideoTime();
-      const key = `${PREFIX}${videoId}`;
-      chrome.storage.local.set({ [key]: { s: 't', t } });
-      closeMenu();
-    });
+    // Keep clicks inside the menu from reaching the player (pause / fullscreen).
+    ['click', 'dblclick', 'mousedown'].forEach((type) => el.addEventListener(type, (e) => e.stopPropagation()));
 
-    const clearBtn = menu.querySelector('#ytwm-action-clear');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => {
-        const key = `${PREFIX}${videoId}`;
-        chrome.storage.local.remove(key);
-        closeMenu();
-      });
-    }
-
-    playerContainer.appendChild(menu);
-    activeMenu = menu;
+    (document.querySelector('#movie_player') || document.body).appendChild(el);
+    paintMenu();
   }
 
   document.addEventListener('click', (e) => {
-    if (activeMenu && !activeMenu.contains(e.target) && !e.target.closest('#ytwm-player-btn')) {
-      closeMenu();
-    }
+    if (menu && !menu.el.contains(e.target) && !e.target.closest(`#${BTN_ID}`)) closeMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMenu();
   });
 
   function injectPlayerButton() {
-    if (!window.location.href.includes('/watch')) return;
-    if (document.getElementById('ytwm-player-btn')) return;
+    if (!location.pathname.startsWith('/watch')) return;
+    if (document.getElementById(BTN_ID)) return;
 
-    const cardsContainer = document.querySelector('.ytp-chrome-top-buttons');
-    if (!cardsContainer) return;
+    const bar = document.querySelector('.ytp-chrome-top-buttons');
+    if (!bar) return;
 
     const btn = document.createElement('button');
-    btn.id = 'ytwm-player-btn';
+    btn.id = BTN_ID;
     btn.className = 'ytp-button';
     btn.title = 'Watch Marker';
     btn.setAttribute('aria-label', 'Watch Marker');
-
-    // Keep size inline with YouTube's player buttons without forcing display block
-    btn.style.cssText = `
-      width: 36px;
-      height: 36px;
-      padding: 0;
-      margin: 0;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      vertical-align: middle;
-      transition: opacity 0.1s cubic-bezier(0,0,0.2,1);
-    `;
-
+    // Outlined ring + check, drawn to match YouTube's own "i" button. The check is
+    // centred on the ring's centre (18, 18).
     btn.innerHTML = `
-      <svg height="100%" version="1.1" viewBox="0 0 36 36" width="100%">
-        <path class="ytp-svg-shadow" d="M18,8 C12.47,8 8,12.47 8,18 8,23.52 12.47,28 18,28 23.52,28 28,23.52 28,18 28,12.47 23.52,8 18,8 Z m-1,15 l-5-5 1.41-1.41 L17,20.17 l7.59-7.59 L26,14 l-9,9 z"></path>
-        <path class="ytp-svg-fill" d="M 18,8 C 12.47,8 8,12.47 8,18 8,23.52 12.47,28 18,28 23.52,28 28,23.52 28,18 28,12.47 23.52,8 18,8 z m -1,15 -5,-5 1.41,-1.41 L 17,20.17 24.59,12.58 26,14 z" fill="#ffffff"></path>
-      </svg>
-    `;
+      <svg viewBox="0 0 36 36" fill="none" stroke="#fff" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="18" cy="18" r="9"/>
+        <path d="M13.5 17.9l3.2 3.2 5.8-6.2"/>
+      </svg>`;
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      if (activeMenu) {
-        closeMenu();
-      } else {
-        createMenu();
-      }
+      if (menu) closeMenu();
+      else createMenu();
     });
 
-    const infoBtn = cardsContainer.querySelector('.ytp-cards-button');
-    if (infoBtn) {
-      cardsContainer.insertBefore(btn, infoBtn);
-    } else {
-      cardsContainer.appendChild(btn);
-    }
-
-    // Ensure style rule exists to hide button when YouTube hides player controls
-    if (!document.getElementById('ytwm-style')) {
-      const style = document.createElement('style');
-      style.id = 'ytwm-style';
-      style.textContent = `
-        .ytp-autohide #ytwm-player-btn,
-        .ytp-user-idle #ytwm-player-btn {
-          opacity: 0 !important;
-          pointer-events: none !important;
-        }
-      `;
-      document.head.appendChild(style);
-    }
+    bar.insertBefore(btn, bar.querySelector(':scope > .ytp-cards-button'));
   }
 
+  // ---- scan / sync -------------------------------------------------------
   function scan() {
     timer = null;
+    injectStyles();
     injectPlayerButton();
 
     if (!onVideosTab()) {
       if (dirty) {
-        document.querySelectorAll('[data-ytwm], [data-ytwm-sep]').forEach((n) => n.remove());
+        clearBadges(document);
         dirty = false;
       }
       return;
@@ -298,14 +264,12 @@
   }
 
   // Initial load of all saved marks.
-  chrome.storage.local.get(null).then((all) => {
-    for (const [k, v] of Object.entries(all)) {
-      if (k.startsWith(PREFIX)) marks.set(k.slice(PREFIX.length), v);
-    }
+  loadAll().then((saved) => {
+    saved.forEach((mark, id) => marks.set(id, mark));
     schedule();
   });
 
-  // Live updates when a mark changes (popup, import, or another tab).
+  // Live updates when a mark changes (popup, import, player menu, or another tab).
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     for (const [k, { newValue }] of Object.entries(changes)) {
@@ -314,18 +278,15 @@
       if (newValue) marks.set(id, newValue);
       else marks.delete(id);
     }
+    paintMenu();
     schedule();
   });
 
   // YouTube is a single-page app: re-scan on DOM changes and navigations.
-  new MutationObserver(schedule).observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-  });
+  new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
 
   document.addEventListener('yt-navigate-finish', () => {
     closeMenu();
     schedule();
   });
-  document.addEventListener('DOMContentLoaded', schedule);
 })();

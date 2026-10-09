@@ -8,23 +8,27 @@
 <body>
   <main>
     <section id="mark">
-      <p id="state" class="state"></p>
-      <div id="actions">
-        <button id="watched" type="button">Mark As Watched</button>
-        <button id="timestamp" type="button">Save Timestamp</button>
-        <button id="clear" type="button">Clear Video History</button>
-      </div>
-      <p id="hint" class="hint" hidden>Open Video To Mark It's Status</p>
+      <header class="status">
+        <span id="chip" class="chip"></span>
+        <p id="state" class="state"></p>
+      </header>
+      <div id="actions"></div>
+    </section>
+
+    <section id="empty" class="status" hidden>
+      <span class="chip" data-icon="unmarked"></span>
+      <p class="state">Open A Video To Mark Its Status</p>
     </section>
 
     <p id="msg" class="msg" role="status" aria-live="polite"></p>
 
     <footer>
-      <button id="export" type="button" class="link">Export</button>
-      <button id="import" type="button" class="link">Import</button>
+      <button id="export" type="button" class="link"><span data-icon="export"></span>Export</button>
+      <button id="import" type="button" class="link"><span data-icon="import"></span>Import</button>
       <input id="file" type="file" accept="application/json,.json" hidden>
     </footer>
   </main>
+  <script src="../scripts/shared.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
