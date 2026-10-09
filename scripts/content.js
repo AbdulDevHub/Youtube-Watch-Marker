@@ -18,7 +18,7 @@
   const marks = new Map();
   let timer = null;
   let dirty = false; // true if badges were injected and need cleanup when leaving /videos
-  let menu = null;   // { el, id, status, flash, hint, flashTimer } while the player menu is open
+  let menu = null;   // { el, id, status, flash, flashTimer } while the player menu is open
 
   const onVideosTab = () => /\/videos\/?$/.test(location.pathname);
   const currentVideoId = () => new URLSearchParams(location.search).get('v');
@@ -92,7 +92,7 @@
     .ytwm-menu {
       position: absolute; top: 52px; right: 16px; z-index: 999999999;
       display: flex; flex-direction: column; gap: 8px;
-      width: 192px; padding: 10px;
+      width: 148px; padding: 10px;
       border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px;
       background: rgba(28, 28, 28, 0.92); backdrop-filter: blur(12px);
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -106,7 +106,7 @@
     .ytwm-status { min-height: 1.3em; padding: 0 2px; color: rgba(255, 255, 255, 0.72); }
     .ytwm-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .ytwm-act {
-      display: grid; place-items: center; height: 40px; padding: 0;
+      display: grid; place-items: center; height: 32px; padding: 0;
       border: 0; border-radius: 10px; cursor: pointer;
       background: rgba(255, 255, 255, 0.1); color: #fff;
       transition: background 0.12s, color 0.12s;
@@ -114,6 +114,7 @@
     .ytwm-act svg { width: 20px; height: 20px; }
     .ytwm-act:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
     .ytwm-act.ytwm-on { background: #fff; color: #0f0f0f; }
+    .ytwm-act.ytwm-on:hover:not(:disabled) { background: #e8e8e8; }
     .ytwm-act.ytwm-danger { color: #ff7b7b; }
     .ytwm-act.ytwm-danger:hover:not(:disabled) { background: rgba(255, 90, 90, 0.22); }
     .ytwm-act:disabled { opacity: 0.35; cursor: default; }
@@ -138,7 +139,7 @@
   function paintMenu() {
     if (!menu) return;
     const mark = marks.get(menu.id) || null;
-    menu.status.textContent = menu.flash ?? menu.hint ?? describe(mark);
+    menu.status.textContent = menu.flash ?? describe(mark, true);
     menu.el.querySelectorAll('.ytwm-act').forEach((b) => {
       b.classList.toggle('ytwm-on', mark?.s === b.dataset.act); // 'w' / 't' match mark.s
       if (b.dataset.act === 'clear') b.disabled = !mark;
@@ -164,7 +165,7 @@
       schedule();
     }
     if (menu?.id === id) {
-      flashMessage(result.message);
+      if (result.message) flashMessage(result.message);
       paintMenu();
     }
   }
@@ -184,19 +185,12 @@
                   data-act="${a.id}" title="${a.label}" aria-label="${a.label}">${icon(a.icon)}</button>`).join('')}
       </div>`;
 
-    menu = { el, id, status: el.querySelector('.ytwm-status'), flash: null, hint: null, flashTimer: null };
+    menu = { el, id, status: el.querySelector('.ytwm-status'), flash: null, flashTimer: null };
 
-    const actions = el.querySelector('.ytwm-actions');
-    actions.addEventListener('click', (e) => {
+    el.querySelector('.ytwm-actions').addEventListener('click', (e) => {
       const b = e.target.closest('.ytwm-act');
       if (b && !b.disabled) runAction(b.dataset.act);
     });
-    // Show the hovered button's name in the status line.
-    actions.addEventListener('mouseover', (e) => {
-      const b = e.target.closest('.ytwm-act');
-      if (b && !b.disabled) { menu.hint = b.title; paintMenu(); }
-    });
-    actions.addEventListener('mouseleave', () => { menu.hint = null; paintMenu(); });
 
     // Keep clicks inside the menu from reaching the player (pause / fullscreen).
     ['click', 'dblclick', 'mousedown'].forEach((type) => el.addEventListener(type, (e) => e.stopPropagation()));

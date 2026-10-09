@@ -17,8 +17,13 @@
     return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
   }
 
-  const label = (mark) => (mark.s === 'w' ? 'Watched Video' : `Watched Till ${fmt(mark.t)}`);
-  const describe = (mark) => (mark ? label(mark) : 'Not Marked');
+  // `withIcon` adds the leading ✓ / ⏱ (used by the player menu; the popup omits it).
+  const label = (mark, withIcon = false) => {
+    const text = mark.s === 'w' ? 'Marked Watched' : `Watched Till ${fmt(mark.t)}`;
+    return withIcon ? `${mark.s === 'w' ? '✓' : '⏱'} ${text}` : text;
+  };
+  const describe = (mark, withIcon = false) =>
+  mark ? label(mark, withIcon) : (withIcon ? '✗ Not Marked' : 'Not Marked');
 
   // ---- actions + icons (rendered by both the popup and the player menu) --
   const ACTIONS = [
@@ -70,25 +75,26 @@
 
   // ---- the one place that decides what each action does ------------------
   // `readTime` is async and returns { t } | { ad } | {}.
-  // Returns { changed, mark?, message }; `mark` is the new state (null = cleared).
+  // Returns { changed, mark?, message? }; `mark` is the new state (null = cleared).
+  // `message` is only set for things the new state can't show (clear, errors).
   async function applyAction(actionId, videoId, readTime) {
-    const commit = async (mark, message) => {
+    const commit = async (mark) => {
       mark.at = Date.now();
       await saveMark(videoId, mark);
-      return { changed: true, mark, message };
+      return { changed: true, mark };
     };
 
     if (actionId === 'clear') {
       await removeMark(videoId);
-      return { changed: true, mark: null, message: "Cleared History" };
+      return { changed: true, mark: null, message: "🗑︎ Cleared History" };
     }
-    if (actionId === 'w') return commit({ s: 'w' }, 'Saved ✓ Watched');
+    if (actionId === 'w') return commit({ s: 'w' });
 
     const { t, ad } = await readTime();
     if (ad) return { changed: false, message: 'An ad is playing. Try again when the video resumes.' };
     if (!Number.isFinite(t)) return { changed: false, message: 'Could not read the video time.' };
     const sec = Math.floor(t);
-    return commit({ s: 't', t: sec }, `Saved ⏱ ${fmt(sec)}`);
+    return commit({ s: 't', t: sec });
   }
 
   globalThis.YTWM = {

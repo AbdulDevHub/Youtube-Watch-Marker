@@ -19,8 +19,8 @@
     $('chip').dataset.kind = current ? current.s : 'none';
     $('chip').innerHTML = icon(current ? (current.s === 'w' ? 'check' : 'clock') : 'unmarked');
 
-    buttons.clear.hidden = !current;          // nothing to clear yet
-    buttons.w.hidden = current?.s === 'w';    // already marked watched
+    buttons.clear.disabled = !current;          // nothing to clear yet
+    buttons.w.disabled = current?.s === 'w';    // already marked watched
   }
 
   function buildActions() {
@@ -46,8 +46,10 @@
     if (result.changed) {
       current = result.mark;
       paint();
+      say('');
+    } else {
+      say(result.message);
     }
-    say(result.message);
   }
 
   // ---- export / import --------------------------------------------------
