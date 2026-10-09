@@ -1,92 +1,49 @@
 // Adds "✓ Watched" / "⏱ m:ss" badges to the views/date row of video cards on a
 // channel's /videos tab, and an in-player menu on watch pages for marking videos.
 // Depends on scripts/shared.js (global YTWM).
-(() => {
-  'use strict';
+;(() => {
+  "use strict"
 
-  const { PREFIX, label, describe, ACTIONS, icon, loadAll, readPlayerTime, applyAction } = YTWM;
+  // ----------------------------- GLOBAL VARIABLES -----------------------------
+  const { PREFIX, label, describe, ACTIONS, icon, loadAll, readPlayerTime, applyAction } = YTWM
 
-  const CARD_SEL = 'yt-lockup-view-model, ytd-grid-video-renderer, ytd-rich-grid-media';
-  const ROW_SEL = '.ytContentMetadataViewModelMetadataRow, #metadata-line';
-  const TEXT_SEL = '.ytContentMetadataViewModelMetadataText, span.inline-metadata-item';
-  const DELIM_SEL = '.ytContentMetadataViewModelDelimiter';
-  const BADGE_SEL = '[data-ytwm], [data-ytwm-sep]';
-
-  const BTN_ID = 'ytwm-player-btn';
-  const FLASH_MS = 1800;
-
-  const marks = new Map();
-  let timer = null;
-  let dirty = false; // true if badges were injected and need cleanup when leaving /videos
-  let menu = null;   // { el, id, status, flash, flashTimer } while the player menu is open
-
-  const onVideosTab = () => /\/videos\/?$/.test(location.pathname);
-  const currentVideoId = () => new URLSearchParams(location.search).get('v');
-
-  // ---- badges on the Videos tab ------------------------------------------
-  function videoIdOf(card) {
-    const a = card.querySelector('a[href*="/watch?v="]');
-    if (!a) return null;
-    try {
-      return new URL(a.getAttribute('href'), location.origin).searchParams.get('v');
-    } catch {
-      return null;
-    }
+  const preferences = {
+    scanDelayMs: 100, // debounce between DOM changes and a re-scan
+    flashMs: 1800, // how long a confirmation stays in the menu status line
   }
 
-  const clearBadges = (root) => root.querySelectorAll(BADGE_SEL).forEach((n) => n.remove());
-
-  function render(card) {
-    const rows = card.querySelectorAll(ROW_SEL);
-    const row = rows[rows.length - 1]; // views/date row is the last metadata row
-    if (!row) return;
-
-    const id = videoIdOf(card);
-    const mark = id ? marks.get(id) : null;
-    const want = mark ? label(mark) : null;
-
-    const existing = row.querySelector('[data-ytwm]');
-    if (existing && existing.dataset.ytwm === want) return; // already correct
-    if (!existing && !want) return;
-
-    clearBadges(row);
-    if (!want) return;
-
-    const texts = row.querySelectorAll(TEXT_SEL);
-    const last = texts[texts.length - 1];
-    const delim = row.querySelector(DELIM_SEL);
-
-    // Clone YouTube's own date span so the badge inherits its font, size and color.
-    const span = last ? last.cloneNode(false) : document.createElement('span');
-    span.removeAttribute('aria-label');
-    span.textContent = want;
-    span.dataset.ytwm = want;
-
-    if (delim) {
-      const sep = delim.cloneNode(true);
-      sep.dataset.ytwmSep = '1';
-      row.append(sep);
-    } else {
-      span.style.marginInlineStart = '0.5em';
-    }
-    row.append(span);
-    dirty = true;
+  const state = {
+    marks: new Map(), // videoId -> mark
+    scanTimer: null,
+    hasBadges: false, // true if badges were injected and need cleanup when leaving /videos
+    menu: null, // { el, id, status, flash, flashTimer } while the player menu is open
   }
 
-  // ---- player menu -------------------------------------------------------
+  // No cached `elements`: YouTube rebuilds its DOM on navigation, so lookups stay on demand
+  const BUTTON_ID = "ytwm-player-btn"
+  const STYLE_ID = "ytwm-style"
+
+  const SELECTORS = {
+    card: "yt-lockup-view-model, ytd-grid-video-renderer, ytd-rich-grid-media",
+    row: ".ytContentMetadataViewModelMetadataRow, #metadata-line",
+    text: ".ytContentMetadataViewModelMetadataText, span.inline-metadata-item",
+    delimiter: ".ytContentMetadataViewModelDelimiter",
+    badge: "[data-ytwm], [data-ytwm-sep]",
+  }
+
   const STYLES = `
-    #${BTN_ID} {
+    #${BUTTON_ID} {
       width: 36px; height: 36px; padding: 0; margin: 0;
       border: 0; background: transparent; cursor: pointer; vertical-align: middle;
       opacity: 0.75; transition: opacity 0.1s cubic-bezier(0, 0, 0.2, 1);
     }
-    #${BTN_ID}:hover,
-    #movie_player:has(.ytwm-menu) #${BTN_ID} { opacity: 1; }
-    #${BTN_ID} svg { display: block; width: 100%; height: 100%; }
+    #${BUTTON_ID}:hover,
+    #movie_player:has(.ytwm-menu) #${BUTTON_ID} { opacity: 1; }
+    #${BUTTON_ID} svg { display: block; width: 100%; height: 100%; }
 
     /* Hide with the rest of the player controls, except while the menu is open. */
-    .ytp-autohide:not(:has(.ytwm-menu)) #${BTN_ID},
-    .ytp-user-idle:not(:has(.ytwm-menu)) #${BTN_ID} { opacity: 0 !important; pointer-events: none !important; }
+    .ytp-autohide:not(:has(.ytwm-menu)) #${BUTTON_ID},
+    .ytp-user-idle:not(:has(.ytwm-menu)) #${BUTTON_ID} { opacity: 0 !important; pointer-events: none !important; }
     #movie_player:has(.ytwm-menu) .ytp-chrome-top { opacity: 1 !important; visibility: visible !important; }
 
     .ytwm-menu {
@@ -119,168 +76,283 @@
     .ytwm-act.ytwm-danger:hover:not(:disabled) { background: rgba(255, 90, 90, 0.22); }
     .ytwm-act:disabled { opacity: 0.35; cursor: default; }
     .ytwm-act:focus-visible { outline: 2px solid #3ea6ff; outline-offset: 2px; }
-  `;
+  `
 
-  function injectStyles() {
-    if (document.getElementById('ytwm-style')) return;
-    const style = document.createElement('style');
-    style.id = 'ytwm-style';
-    style.textContent = STYLES;
-    document.head.appendChild(style);
+  // ----------------------------- UTILITIES -----------------------------
+  const utils = {
+    isVideosTab: () => /\/videos\/?$/.test(location.pathname),
+
+    currentVideoId: () => new URLSearchParams(location.search).get("v"),
   }
 
-  function closeMenu() {
-    if (!menu) return;
-    clearTimeout(menu.flashTimer);
-    menu.el.remove();
-    menu = null;
+  // ----------------------------- SAVED MARKS -----------------------------
+  const savedMarks = {
+    // A falsy mark means the video was cleared
+    update(id, mark) {
+      if (mark) state.marks.set(id, mark)
+      else state.marks.delete(id)
+    },
   }
 
-  function paintMenu() {
-    if (!menu) return;
-    const mark = marks.get(menu.id) || null;
-    menu.status.textContent = menu.flash ?? describe(mark, true);
-    menu.el.querySelectorAll('.ytwm-act').forEach((b) => {
-      b.classList.toggle('ytwm-on', mark?.s === b.dataset.act); // 'w' / 't' match mark.s
-      if (b.dataset.act === 'clear') b.disabled = !mark;
-    });
-  }
-
-  function flashMessage(text) {
-    clearTimeout(menu.flashTimer);
-    menu.flash = text;
-    menu.flashTimer = setTimeout(() => {
-      if (!menu) return;
-      menu.flash = null;
-      paintMenu();
-    }, FLASH_MS);
-  }
-
-  async function runAction(actionId) {
-    const id = menu.id;
-    const result = await applyAction(actionId, id, async () => readPlayerTime());
-    if (result.changed) {
-      if (result.mark) marks.set(id, result.mark);
-      else marks.delete(id);
-      schedule();
-    }
-    if (menu?.id === id) {
-      if (result.message) flashMessage(result.message);
-      paintMenu();
-    }
-  }
-
-  function createMenu() {
-    closeMenu();
-    const id = currentVideoId();
-    if (!id) return;
-
-    const el = document.createElement('div');
-    el.className = 'ytwm-menu';
-    el.innerHTML = `
-      <div class="ytwm-status" role="status" aria-live="polite"></div>
-      <div class="ytwm-actions">
-        ${ACTIONS.map((a) => `
-          <button type="button" class="ytwm-act${a.danger ? ' ytwm-danger' : ''}"
-                  data-act="${a.id}" title="${a.label}" aria-label="${a.label}">${icon(a.icon)}</button>`).join('')}
-      </div>`;
-
-    menu = { el, id, status: el.querySelector('.ytwm-status'), flash: null, flashTimer: null };
-
-    el.querySelector('.ytwm-actions').addEventListener('click', (e) => {
-      const b = e.target.closest('.ytwm-act');
-      if (b && !b.disabled) runAction(b.dataset.act);
-    });
-
-    // Keep clicks inside the menu from reaching the player (pause / fullscreen).
-    ['click', 'dblclick', 'mousedown'].forEach((type) => el.addEventListener(type, (e) => e.stopPropagation()));
-
-    (document.querySelector('#movie_player') || document.body).appendChild(el);
-    paintMenu();
-  }
-
-  document.addEventListener('click', (e) => {
-    if (menu && !menu.el.contains(e.target) && !e.target.closest(`#${BTN_ID}`)) closeMenu();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeMenu();
-  });
-
-  function injectPlayerButton() {
-    if (!location.pathname.startsWith('/watch')) return;
-    if (document.getElementById(BTN_ID)) return;
-
-    const bar = document.querySelector('.ytp-chrome-top-buttons');
-    if (!bar) return;
-
-    const btn = document.createElement('button');
-    btn.id = BTN_ID;
-    btn.className = 'ytp-button';
-    btn.title = 'Watch Marker';
-    btn.setAttribute('aria-label', 'Watch Marker');
-    // Outlined ring + check, drawn to match YouTube's own "i" button. The check is
-    // centred on the ring's centre (18, 18).
-    btn.innerHTML = `
-      <svg viewBox="0 0 36 36" fill="none" stroke="#fff" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="18" cy="18" r="9"/>
-        <path d="M13.5 17.9l3.2 3.2 5.8-6.2"/>
-      </svg>`;
-
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      if (menu) closeMenu();
-      else createMenu();
-    });
-
-    bar.insertBefore(btn, bar.querySelector(':scope > .ytp-cards-button'));
-  }
-
-  // ---- scan / sync -------------------------------------------------------
-  function scan() {
-    timer = null;
-    injectStyles();
-    injectPlayerButton();
-
-    if (!onVideosTab()) {
-      if (dirty) {
-        clearBadges(document);
-        dirty = false;
+  // ----------------------------- BADGES -----------------------------
+  const badges = {
+    videoIdOf(card) {
+      const link = card.querySelector('a[href*="/watch?v="]')
+      if (!link) return null
+      try {
+        return new URL(link.getAttribute("href"), location.origin).searchParams.get("v")
+      } catch {
+        return null
       }
-      return;
-    }
-    document.querySelectorAll(CARD_SEL).forEach(render);
+    },
+
+    clear(root) {
+      root.querySelectorAll(SELECTORS.badge).forEach((node) => node.remove())
+    },
+
+    render(card) {
+      const rows = card.querySelectorAll(SELECTORS.row)
+      const row = rows[rows.length - 1] // views/date row is the last metadata row
+      if (!row) return
+
+      const id = badges.videoIdOf(card)
+      const mark = id ? state.marks.get(id) : null
+      const want = mark ? label(mark) : null
+
+      const existing = row.querySelector("[data-ytwm]")
+      if (existing && existing.dataset.ytwm === want) return // already correct
+      if (!existing && !want) return
+
+      badges.clear(row)
+      if (!want) return
+
+      const texts = row.querySelectorAll(SELECTORS.text)
+      const last = texts[texts.length - 1]
+      const delimiter = row.querySelector(SELECTORS.delimiter)
+
+      // Clone YouTube's own date span so the badge inherits its font, size and color.
+      const span = last ? last.cloneNode(false) : document.createElement("span")
+      span.removeAttribute("aria-label")
+      span.textContent = want
+      span.dataset.ytwm = want
+
+      if (delimiter) {
+        const separator = delimiter.cloneNode(true)
+        separator.dataset.ytwmSep = "1"
+        row.append(separator)
+      } else {
+        span.style.marginInlineStart = "0.5em"
+      }
+      row.append(span)
+      state.hasBadges = true
+    },
   }
 
-  function schedule() {
-    if (timer === null) timer = setTimeout(scan, 100);
+  // ----------------------------- PLAYER MENU -----------------------------
+  const playerMenu = {
+    injectStyles() {
+      if (document.getElementById(STYLE_ID)) return
+      const style = document.createElement("style")
+      style.id = STYLE_ID
+      style.textContent = STYLES
+      document.head.appendChild(style)
+    },
+
+    close() {
+      if (!state.menu) return
+      clearTimeout(state.menu.flashTimer)
+      state.menu.el.remove()
+      state.menu = null
+    },
+
+    paint() {
+      if (!state.menu) return
+      const mark = state.marks.get(state.menu.id) || null
+      state.menu.status.textContent = state.menu.flash ?? describe(mark, true)
+      state.menu.el.querySelectorAll(".ytwm-act").forEach((button) => {
+        button.classList.toggle("ytwm-on", mark?.s === button.dataset.act) // "w" / "t" match mark.s
+        if (button.dataset.act === "clear") button.disabled = !mark
+      })
+    },
+
+    flash(text) {
+      clearTimeout(state.menu.flashTimer)
+      state.menu.flash = text
+      state.menu.flashTimer = setTimeout(() => {
+        if (!state.menu) return
+        state.menu.flash = null
+        playerMenu.paint()
+      }, preferences.flashMs)
+    },
+
+    async runAction(actionId) {
+      const id = state.menu.id
+      const result = await applyAction(actionId, id, async () => readPlayerTime())
+      if (result.changed) {
+        savedMarks.update(id, result.mark)
+        scanner.schedule()
+      }
+      if (state.menu?.id === id) {
+        if (result.message) playerMenu.flash(result.message)
+        playerMenu.paint()
+      }
+    },
+
+    create() {
+      playerMenu.close()
+      const id = utils.currentVideoId()
+      if (!id) return
+
+      const el = document.createElement("div")
+      el.className = "ytwm-menu"
+      el.innerHTML = `
+        <div class="ytwm-status" role="status" aria-live="polite"></div>
+        <div class="ytwm-actions">
+          ${ACTIONS.map(
+            (action) => `
+            <button type="button" class="ytwm-act${action.danger ? " ytwm-danger" : ""}"
+                    data-act="${action.id}" title="${action.label}" aria-label="${action.label}">${icon(action.icon)}</button>`
+          ).join("")}
+        </div>`
+
+      state.menu = {
+        el,
+        id,
+        status: el.querySelector(".ytwm-status"),
+        flash: null,
+        flashTimer: null,
+      }
+
+      el.querySelector(".ytwm-actions").addEventListener("click", (e) => {
+        const button = e.target.closest(".ytwm-act")
+        if (button && !button.disabled) playerMenu.runAction(button.dataset.act)
+      })
+
+      // Keep clicks inside the menu from reaching the player (pause / fullscreen).
+      ;["click", "dblclick", "mousedown"].forEach((type) => {
+        el.addEventListener(type, (e) => e.stopPropagation())
+      })
+
+      ;(document.querySelector("#movie_player") || document.body).appendChild(el)
+      playerMenu.paint()
+    },
+
+    toggle() {
+      if (state.menu) playerMenu.close()
+      else playerMenu.create()
+    },
+
+    injectButton() {
+      if (!location.pathname.startsWith("/watch")) return
+      if (document.getElementById(BUTTON_ID)) return
+
+      const bar = document.querySelector(".ytp-chrome-top-buttons")
+      if (!bar) return
+
+      const button = document.createElement("button")
+      button.id = BUTTON_ID
+      button.className = "ytp-button"
+      button.title = "Watch Marker"
+      button.setAttribute("aria-label", "Watch Marker")
+      // Outlined ring + check, drawn to match YouTube's own "i" button. The check is
+      // centred on the ring's centre (18, 18).
+      button.innerHTML = `
+        <svg viewBox="0 0 36 36" fill="none" stroke="#fff" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="18" cy="18" r="9"/>
+          <path d="M13.5 17.9l3.2 3.2 5.8-6.2"/>
+        </svg>`
+
+      button.addEventListener("click", (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        playerMenu.toggle()
+      })
+
+      bar.insertBefore(button, bar.querySelector(":scope > .ytp-cards-button"))
+    },
   }
 
-  // Initial load of all saved marks.
-  loadAll().then((saved) => {
-    saved.forEach((mark, id) => marks.set(id, mark));
-    schedule();
-  });
+  // ----------------------------- SCANNER -----------------------------
+  const scanner = {
+    scan() {
+      state.scanTimer = null
+      playerMenu.injectStyles()
+      playerMenu.injectButton()
 
-  // Live updates when a mark changes (popup, import, player menu, or another tab).
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    for (const [k, { newValue }] of Object.entries(changes)) {
-      if (!k.startsWith(PREFIX)) continue;
-      const id = k.slice(PREFIX.length);
-      if (newValue) marks.set(id, newValue);
-      else marks.delete(id);
-    }
-    paintMenu();
-    schedule();
-  });
+      if (!utils.isVideosTab()) {
+        if (state.hasBadges) {
+          badges.clear(document)
+          state.hasBadges = false
+        }
+        return
+      }
+      document.querySelectorAll(SELECTORS.card).forEach(badges.render)
+    },
 
-  // YouTube is a single-page app: re-scan on DOM changes and navigations.
-  new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    schedule() {
+      if (state.scanTimer !== null) return
+      state.scanTimer = setTimeout(scanner.scan, preferences.scanDelayMs)
+    },
+  }
 
-  document.addEventListener('yt-navigate-finish', () => {
-    closeMenu();
-    schedule();
-  });
-})();
+  // ----------------------------- EVENT HANDLERS -----------------------------
+  const eventHandlers = {
+    handleDocumentClick: (e) => {
+      if (!state.menu) return
+      if (!state.menu.el.contains(e.target) && !e.target.closest(`#${BUTTON_ID}`)) {
+        playerMenu.close()
+      }
+    },
+
+    handleKeydown: (e) => {
+      if (e.key === "Escape") playerMenu.close()
+    },
+
+    // Live updates when a mark changes (popup, import, player menu, or another tab)
+    handleStorageChange: (changes, area) => {
+      if (area !== "local") return
+      for (const [key, { newValue }] of Object.entries(changes)) {
+        if (!key.startsWith(PREFIX)) continue
+        savedMarks.update(key.slice(PREFIX.length), newValue)
+      }
+      playerMenu.paint()
+      scanner.schedule()
+    },
+
+    handleNavigation: () => {
+      playerMenu.close()
+      scanner.schedule()
+    },
+  }
+
+  // ----------------------------- INITIALIZATION -----------------------------
+  // Initial load of all saved marks
+  async function initializeMarks() {
+    const saved = await loadAll()
+    saved.forEach((mark, id) => state.marks.set(id, mark))
+    scanner.schedule()
+  }
+
+  function initializeEventListeners() {
+    // ============= DOCUMENT EVENTS =============
+    document.addEventListener("click", eventHandlers.handleDocumentClick)
+    document.addEventListener("keydown", eventHandlers.handleKeydown)
+    document.addEventListener("yt-navigate-finish", eventHandlers.handleNavigation)
+
+    // ============= STORAGE EVENTS =============
+    chrome.storage.onChanged.addListener(eventHandlers.handleStorageChange)
+
+    // ============= DOM EVENTS =============
+    // YouTube is a single-page app: re-scan on DOM changes and navigations.
+    const observer = new MutationObserver(scanner.schedule)
+    observer.observe(document.documentElement, { childList: true, subtree: true })
+  }
+
+  function initialize() {
+    initializeEventListeners()
+    initializeMarks()
+  }
+
+  initialize()
+})()
