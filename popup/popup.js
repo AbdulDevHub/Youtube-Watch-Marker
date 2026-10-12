@@ -24,6 +24,7 @@
     emptyNotice: document.querySelector("#empty"),
     toggleSaved: document.querySelector("#toggleSaved"),
     savedLabel: document.querySelector("#savedLabel"),
+    savedCount: document.querySelector("#savedCount"),
     savedList: document.querySelector("#saved"),
   }
 
