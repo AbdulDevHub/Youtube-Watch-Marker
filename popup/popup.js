@@ -22,6 +22,9 @@
     fileInput: document.querySelector("#file"),
     markSection: document.querySelector("#mark"),
     emptyNotice: document.querySelector("#empty"),
+    toggleSaved: document.querySelector("#toggleSaved"),
+    savedLabel: document.querySelector("#savedLabel"),
+    savedList: document.querySelector("#saved"),
   }
 
   // ----------------------------- UTILITIES -----------------------------
@@ -86,9 +89,86 @@
         state.current = result.mark
         ui.paint()
         ui.say("")
+        saved.refreshCount()
+        if (!elements.savedList.hidden) saved.render()
       } else {
         ui.say(result.message)
       }
+    },
+  }
+
+  // ----------------------------- SAVED TIMESTAMPS -----------------------------
+  const saved = {
+    titleKey: (id) => "title:" + id,
+
+    async title(id) {
+      const key = saved.titleKey(id)
+      const cached = (await chrome.storage.local.get(key))[key]
+      if (cached) return cached
+      try {
+        const url = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`
+        const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`)
+        if (!res.ok) return null
+        const title = (await res.json()).title
+        if (title) await chrome.storage.local.set({ [key]: title })
+        return title || null
+      } catch {
+        return null
+      }
+    },
+
+    async list() {
+      const marks = await loadAll()
+      return [...marks]
+        .filter(([, mark]) => mark && mark.s === "t")
+        .sort((a, b) => (b[1].at || 0) - (a[1].at || 0))
+    },
+
+    async refreshCount() {
+      const items = await saved.list()
+      const count = items.length
+      elements.savedCount.textContent = count
+      elements.savedCount.hidden = !count
+    },
+
+    async render() {
+      const items = await saved.list()
+      elements.savedList.replaceChildren()
+      if (!items.length) {
+        const li = document.createElement("li")
+        li.className = "none"
+        li.textContent = "No saved timestamps yet."
+        elements.savedList.append(li)
+        return
+      }
+      for (const [id, mark] of items) {
+        const li = document.createElement("li")
+        const link = document.createElement("a")
+        link.href = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}&t=${mark.t}s`
+        const title = document.createElement("span")
+        title.className = "t"
+        title.textContent = "Loading…"
+        const at = document.createElement("span")
+        at.className = "at"
+        at.textContent = `Resume at ${YTWM.fmt(mark.t)}`
+        link.append(title, at)
+        link.addEventListener("click", (event) => {
+          event.preventDefault()
+          chrome.tabs.create({ url: link.href })
+        })
+        li.append(link)
+        elements.savedList.append(li)
+        saved.title(id).then((text) => {
+          title.textContent = text || id
+        })
+      }
+    },
+
+    async toggle() {
+      const open = elements.savedList.hidden
+      elements.savedList.hidden = !open
+      elements.toggleSaved.setAttribute("aria-expanded", String(open))
+      if (open) await saved.render()
     },
   }
 
@@ -147,9 +227,11 @@
   }
 
   async function initializePopup() {
+    saved.refreshCount()
     if (state.isTabMode) {
       document.body.classList.add("tab")
       elements.markSection.hidden = true
+      elements.toggleSaved.hidden = true
       ui.say("Choose a JSON file from a previous export. Imported marks overwrite matching videos.")
       return
     }
@@ -168,6 +250,7 @@
 
   function initializeEventListeners() {
     // ============= EXPORT / IMPORT EVENTS =============
+    elements.toggleSaved.addEventListener("click", saved.toggle)
     elements.exportButton.addEventListener("click", backup.exportMarks)
     elements.importButton.addEventListener("click", backup.startImport)
     elements.fileInput.addEventListener("change", backup.handleFile)

@@ -99,6 +99,70 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .msg { min-height: 1.4em; margin: 0; color: var(--muted); font-size: 13px; }
 
+/* Saved timestamps section */
+.section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  transition: background 0.12s;
+}
+.section svg { flex: none; width: 18px; height: 18px; }
+.section:hover { background: var(--btn-hover); }
+.section:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.section > span:first-child { display: inline-flex; }
+
+.count {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--time-bg);
+  color: var(--time);
+}
+
+.caret { display: inline-flex; color: var(--muted); }
+.caret svg { width: 16px; height: 16px; transition: transform 0.15s; }
+#toggleSaved[aria-expanded="true"] .caret svg { transform: rotate(180deg); }
+
+.saved {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.saved a {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--btn);
+  color: inherit;
+  text-decoration: none;
+}
+.saved a:hover { background: var(--btn-hover); }
+.saved a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.saved .t { font-size: 13px; font-weight: 500; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.saved .at {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--time-bg);
+  color: var(--time);
+  justify-self: start;
+}
+.saved .none { color: var(--muted); font-size: 13px; padding: 8px 4px; }
+
 /* Export / import */
 footer {
   display: flex;

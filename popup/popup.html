@@ -20,6 +20,14 @@
       <p class="state">Open A Video To Mark Its Status</p>
     </section>
 
+    <button id="toggleSaved" type="button" class="section" aria-expanded="false">
+      <span data-icon="menu"></span>
+      <span id="savedLabel">Saved Timestamps</span>
+      <span id="savedCount" class="count" hidden></span>
+      <span class="caret" data-icon="chevron"></span>
+    </button>
+    <ul id="saved" class="saved" hidden></ul>
+
     <p id="msg" class="msg" role="status" aria-live="polite"></p>
 
     <footer>

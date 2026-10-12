@@ -23,6 +23,8 @@
     unmarked: '<circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/>',
     export: '<path d="M12 15V4m0 0L8 8m4-4l4 4"/><path d="M5 20h14"/>',
     import: '<path d="M12 4v11m0 0l-4-4m4 4l4-4"/><path d="M5 20h14"/>',
+    menu: '<path d="M6 6h12M6 12h12M6 18h12"/>',
+    chevron: '<path d="M6 9h12l-6 7-6-7"/>',
   }
 
   // ----------------------------- UTILITIES -----------------------------
