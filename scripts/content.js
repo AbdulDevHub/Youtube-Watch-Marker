@@ -117,7 +117,7 @@
 
       const id = badges.videoIdOf(card)
       const mark = id ? state.marks.get(id) : null
-      const want = mark ? label(mark) : null
+      const want = mark ? label(mark, true) : null
 
       const existing = row.querySelector("[data-ytwm]")
       if (existing && existing.dataset.ytwm === want) return // already correct
