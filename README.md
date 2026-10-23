@@ -2,12 +2,17 @@
 
 A lightweight Chrome Extension (Manifest V3) that lets you mark YouTube videos as watched or save your current timestamp directly from the popup player. Badges are displayed on channel **Videos** tabs to help you keep track of what you've seen.
 
+## Project Overview
+
+YouTube doesn't tell you which of a channel's videos you've already seen, especially for long videos you stop halfway. This extension fills that gap. While watching, you click a small check icon in the player (or use the toolbar popup) to mark the video as watched or remember where you stopped. Back on the channel's Videos tab, each marked video shows a small "Watched" or "Watched Till 12:34" label. When a video finishes, the menu pops up on its own so you don't forget to mark it. Everything is stored locally in your browser, with nothing sent anywhere.
+
 ## Features
 
 - **Mark as Watched:** Flag any YouTube video as watched with a single click.
 - **Save Timestamps:** Save your current playback position (e.g., `⏱ 12:34`) to resume or reference later.
 - **Channel /Videos Integration:** Displays `✓ Watched` or timestamp badges alongside video metadata on channel pages.
 - **Import / Export:** Backup or transfer your saved history as a JSON file across browsers or devices.
+- **In-Player Menu:** A check icon in the player's top-right opens a quick menu; it opens automatically when a video ends.
 - **Clean UI:** Contextual popup interface that dynamically updates based on whether you're viewing a video or browsing a channel.
 
 ## Installation
