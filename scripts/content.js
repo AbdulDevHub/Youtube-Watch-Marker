@@ -38,13 +38,28 @@
       opacity: 0.75; transition: opacity 0.1s cubic-bezier(0, 0, 0.2, 1);
     }
     #${BUTTON_ID}:hover,
-    #movie_player:has(.ytwm-menu) #${BUTTON_ID} { opacity: 1; }
+    #movie_player:has(.ytwm-menu) #${BUTTON_ID},
+    #movie_player.ended-mode #${BUTTON_ID} { opacity: 1; }
     #${BUTTON_ID} svg { display: block; width: 100%; height: 100%; }
 
-    /* Hide with the rest of the player controls, except while the menu is open. */
-    .ytp-autohide:not(:has(.ytwm-menu)) #${BUTTON_ID},
-    .ytp-user-idle:not(:has(.ytwm-menu)) #${BUTTON_ID} { opacity: 0 !important; pointer-events: none !important; }
-    #movie_player:has(.ytwm-menu) .ytp-chrome-top { opacity: 1 !important; visibility: visible !important; }
+    /* Hide with the rest of the player controls, except while the menu is open or the video has ended. */
+    .ytp-autohide:not(:has(.ytwm-menu), .ended-mode) #${BUTTON_ID},
+    .ytp-user-idle:not(:has(.ytwm-menu), .ended-mode) #${BUTTON_ID} { opacity: 0 !important; pointer-events: none !important; }
+    #movie_player:is(.ended-mode, :has(.ytwm-menu)) .ytp-chrome-top {
+      display: flex !important; opacity: 1 !important; visibility: visible !important;
+    }
+    /* The button lives in the overlays container, which YouTube hides once the video ends. */
+    #movie_player.ended-mode :is(.ytp-overlays-container, .ytp-overlay-top-right, .ytp-chrome-top-buttons) {
+      display: block !important; opacity: 1 !important; visibility: visible !important;
+    }
+    #movie_player.ended-mode .ytp-overlays-container { z-index: 70 !important; }
+    #movie_player.ended-mode .ytp-overlay-top-right {
+      position: absolute !important; top: 0 !important; right: 0 !important; left: auto !important;
+    }
+    #movie_player.ended-mode .ytp-chrome-top-buttons { display: flex !important; justify-content: flex-end; }
+    #movie_player.ended-mode #${BUTTON_ID} {
+      display: inline-block !important; visibility: visible !important; pointer-events: auto !important;
+    }
 
     .ytwm-menu {
       position: absolute; top: 52px; right: 16px; z-index: 999999999;
@@ -320,6 +335,15 @@
       scanner.schedule()
     },
 
+    // Open the menu when the video finishes, since YouTube hides the player controls then.
+    // "ended" doesn't bubble, so this is registered in the capture phase.
+    handleVideoEnded: (e) => {
+      if (!(e.target instanceof HTMLVideoElement)) return
+      if (!location.pathname.startsWith("/watch") || state.menu) return
+      playerMenu.injectButton()
+      playerMenu.create()
+    },
+
     handleNavigation: () => {
       playerMenu.close()
       scanner.schedule()
@@ -339,6 +363,7 @@
     document.addEventListener("click", eventHandlers.handleDocumentClick)
     document.addEventListener("keydown", eventHandlers.handleKeydown)
     document.addEventListener("yt-navigate-finish", eventHandlers.handleNavigation)
+    document.addEventListener("ended", eventHandlers.handleVideoEnded, true)
 
     // ============= STORAGE EVENTS =============
     chrome.storage.onChanged.addListener(eventHandlers.handleStorageChange)
