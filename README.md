@@ -13,8 +13,9 @@ YouTube doesn't tell you which of a channel's videos you've already seen, especi
 - **Channel /Videos Integration:** Displays `✓ Watched` or timestamp badges alongside video metadata on channel pages.
 - **Import / Export:** Backup or transfer your saved history as a JSON file across browsers or devices.
 - **In-Player Menu:** A check icon in the player's top-right opens a quick menu; it opens automatically when a video ends.
+- **Green Check:** The player's check icon turns light green when the video is marked watched, so you can tell without opening the menu.
 - **Auto-Mark on End:** A video that plays to the end is marked watched (replacing a saved timestamp). The menu stays open so you can clear it.
-- **New-Video Badges:** On `/feed/channels`, each channel shows `● New video` or `✓ Up to date`, based on whether its latest video is marked. Results are cached for 24 hours.
+- **New-Video Badges:** On `/feed/channels`, each channel shows a purple `● New video` pill or a muted `✓ Up to date`, based on whether its latest video is marked. Results are cached for 24 hours.
 - **Clean UI:** Contextual popup interface that dynamically updates based on whether you're viewing a video or browsing a channel.
 
 ## Installation

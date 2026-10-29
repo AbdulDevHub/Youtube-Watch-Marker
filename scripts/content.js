@@ -46,8 +46,9 @@
     #${BUTTON_ID} {
       width: 36px; height: 36px; padding: 0; margin: 0;
       border: 0; background: transparent; cursor: pointer; vertical-align: middle;
-      opacity: 0.75; transition: opacity 0.1s cubic-bezier(0, 0, 0.2, 1);
+      color: #fff; opacity: 0.75; transition: opacity 0.1s cubic-bezier(0, 0, 0.2, 1);
     }
+    #${BUTTON_ID}.ytwm-watched { color: #7ee787; } /* light green: this video is marked watched */
     #${BUTTON_ID}:hover,
     #movie_player:has(.ytwm-menu) #${BUTTON_ID},
     #movie_player.ended-mode #${BUTTON_ID} { opacity: 1; }
@@ -103,11 +104,13 @@
     .ytwm-act:disabled { opacity: 0.35; cursor: default; }
     .ytwm-act:focus-visible { outline: 2px solid #3ea6ff; outline-offset: 2px; }
 
+    /* Out of the flow, so the pill doesn't take width from the Subscribed button beside it. */
+    #info-section:has(> .ytwm-chan) { position: relative; }
     .ytwm-chan {
-      display: inline-block; align-self: flex-start; margin-top: 6px; padding: 2px 8px;
+      position: absolute; top: 6px; right: 0; padding: 2px 8px;
       border-radius: 10px; font: 500 12px/1.5 Roboto, Arial, sans-serif;
     }
-    .ytwm-chan-new { background: #3ea6ff; color: #0f0f0f; }
+    .ytwm-chan-new { background: #8b5cf6; color: #fff; }
     .ytwm-chan-seen { color: var(--yt-spec-text-secondary, #aaa); padding-left: 0; }
   `
 
@@ -367,6 +370,12 @@
       else playerMenu.create()
     },
 
+    // Tint the player button green while the current video is marked watched
+    paintButton() {
+      const watched = state.marks.get(utils.currentVideoId())?.s === "w"
+      document.getElementById(BUTTON_ID)?.classList.toggle("ytwm-watched", watched)
+    },
+
     injectButton() {
       if (!location.pathname.startsWith("/watch")) return
       if (document.getElementById(BUTTON_ID)) return
@@ -382,7 +391,7 @@
       // Outlined ring + check, drawn to match YouTube's own "i" button. The check is
       // centred on the ring's centre (18, 18).
       button.innerHTML = `
-        <svg viewBox="0 0 36 36" fill="none" stroke="#fff" stroke-width="2"
+        <svg viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="18" cy="18" r="9"/>
           <path d="M13.5 17.9l3.2 3.2 5.8-6.2"/>
@@ -404,6 +413,7 @@
       state.scanTimer = null
       playerMenu.injectStyles()
       playerMenu.injectButton()
+      playerMenu.paintButton()
 
       const onChannelsFeed = utils.isChannelsFeed()
       if (onChannelsFeed) channelCheck.scan()
@@ -473,6 +483,7 @@
       if (utils.currentVideoId() !== id) return // navigated away while saving
 
       playerMenu.injectButton()
+      playerMenu.paintButton()
       if (state.menu) playerMenu.paint()
       else playerMenu.create()
       if (autoMarked && state.menu?.id === id) {
