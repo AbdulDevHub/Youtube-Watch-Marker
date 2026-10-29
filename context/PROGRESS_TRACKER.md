@@ -10,19 +10,21 @@ them into the "Earlier history" paragraph instead of deleting them.
 - Mark watched / save timestamp / clear, from the popup and from an in-player menu (button in the player's top-right).
 - Badges ("✓ Marked Watched", "⏱ Watched Till m:ss") on channel /videos tabs.
 - Popup has a collapsible saved-timestamps list with count and video titles; import/export as JSON.
-- When a video ends, the player menu opens automatically and the player button stays visible and correctly placed.
-- Version 1.1.0.
+- When a video ends, it is auto-marked watched (overwriting a saved timestamp), the player menu opens automatically and the player button stays visible and correctly placed.
+- `/feed/channels` shows "● New video" / "✓ Up to date" per channel, from each channel's latest video (cached 24h).
+- Version 1.2.0.
 
 ## In progress
 
-- Nothing.
+- Owner to reload the extension and confirm both features on real YouTube (not yet verified in a browser).
 
 ## Next steps
 
-- None planned.
+- Verify: auto-mark on end (incl. an ad ending must not mark), badge placement on /feed/channels.
 
 ## Session log
 
+- 2026-10-29: Added auto-mark on video end and new-video badges on /feed/channels (`channelCheck` in `content.js`, 24h cache under `latest:<@handle>`). Parsing of `ytInitialData` was checked against @mkbhd; syntax-checked only, UI untouched by a browser run.
 - 2026-10-22: Fixed the player button vanishing when a video ends. The menu now auto-opens on the `ended` event. The button's overlay container is forced visible under `.ended-mode`, with explicit top-right positioning (forcing `display: block` had moved it to the top-left). Confirmed working by the owner. Added AGENTS.md and this tracker.
 
 ## Earlier history

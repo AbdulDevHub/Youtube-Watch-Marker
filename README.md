@@ -4,7 +4,7 @@ A lightweight Chrome Extension (Manifest V3) that lets you mark YouTube videos a
 
 ## Project Overview
 
-YouTube doesn't tell you which of a channel's videos you've already seen, especially for long videos you stop halfway. This extension fills that gap. While watching, you click a small check icon in the player (or use the toolbar popup) to mark the video as watched or remember where you stopped. Back on the channel's Videos tab, each marked video shows a small "Watched" or "Watched Till 12:34" label. When a video finishes, the menu pops up on its own so you don't forget to mark it. Everything is stored locally in your browser, with nothing sent anywhere.
+YouTube doesn't tell you which of a channel's videos you've already seen, especially for long videos you stop halfway. This extension fills that gap. While watching, you click a small check icon in the player (or use the toolbar popup) to mark the video as watched or remember where you stopped. Back on the channel's Videos tab, each marked video shows a small "Watched" or "Watched Till 12:34" label. When a video finishes, it is marked watched automatically and the menu pops up so you can undo that. On your subscriptions list (`/feed/channels`), each channel shows "New video" when its newest video has no mark, so you don't have to open every channel to check. Everything is stored locally in your browser, with nothing sent anywhere.
 
 ## Features
 
@@ -13,6 +13,8 @@ YouTube doesn't tell you which of a channel's videos you've already seen, especi
 - **Channel /Videos Integration:** Displays `✓ Watched` or timestamp badges alongside video metadata on channel pages.
 - **Import / Export:** Backup or transfer your saved history as a JSON file across browsers or devices.
 - **In-Player Menu:** A check icon in the player's top-right opens a quick menu; it opens automatically when a video ends.
+- **Auto-Mark on End:** A video that plays to the end is marked watched (replacing a saved timestamp). The menu stays open so you can clear it.
+- **New-Video Badges:** On `/feed/channels`, each channel shows `● New video` or `✓ Up to date`, based on whether its latest video is marked. Results are cached for 24 hours.
 - **Clean UI:** Contextual popup interface that dynamically updates based on whether you're viewing a video or browsing a channel.
 
 ## Installation

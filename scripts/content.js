@@ -10,25 +10,36 @@
   const preferences = {
     scanDelayMs: 100, // debounce between DOM changes and a re-scan
     flashMs: 1800, // how long a confirmation stays in the menu status line
+    channelCacheMs: 24 * 60 * 60 * 1000, // how long a channel's latest video id is reused
+    channelConcurrency: 3, // simultaneous /videos page fetches on the channels feed
   }
 
   const state = {
     marks: new Map(), // videoId -> mark
     scanTimer: null,
-    hasBadges: false, // true if badges were injected and need cleanup when leaving /videos
+    hasBadges: false, // true if badges were injected and need cleanup when leaving their page
     menu: null, // { el, id, status, flash, flashTimer } while the player menu is open
+    marking: new Set(), // video ids with an auto-mark save in flight
+    channels: {
+      latest: new Map(), // "@handle" -> id of the channel's newest video
+      requested: new Set(), // handles already queued during this visit to /feed/channels
+      queue: [],
+      active: 0,
+    },
   }
 
   // No cached `elements`: YouTube rebuilds its DOM on navigation, so lookups stay on demand
   const BUTTON_ID = "ytwm-player-btn"
   const STYLE_ID = "ytwm-style"
+  const LATEST_PREFIX = "latest:" // storage key: latest:<@handle> -> { id, at }
 
   const SELECTORS = {
     card: "yt-lockup-view-model, ytd-grid-video-renderer, ytd-rich-grid-media",
     row: ".ytContentMetadataViewModelMetadataRow, #metadata-line",
     text: ".ytContentMetadataViewModelMetadataText, span.inline-metadata-item",
     delimiter: ".ytContentMetadataViewModelDelimiter",
-    badge: "[data-ytwm], [data-ytwm-sep]",
+    badge: "[data-ytwm], [data-ytwm-sep], [data-ytwm-chan]",
+    channelRow: "ytd-channel-renderer",
   }
 
   const STYLES = `
@@ -91,11 +102,20 @@
     .ytwm-act.ytwm-danger:hover:not(:disabled) { background: rgba(255, 90, 90, 0.22); }
     .ytwm-act:disabled { opacity: 0.35; cursor: default; }
     .ytwm-act:focus-visible { outline: 2px solid #3ea6ff; outline-offset: 2px; }
+
+    .ytwm-chan {
+      display: inline-block; align-self: flex-start; margin-top: 6px; padding: 2px 8px;
+      border-radius: 10px; font: 500 12px/1.5 Roboto, Arial, sans-serif;
+    }
+    .ytwm-chan-new { background: #3ea6ff; color: #0f0f0f; }
+    .ytwm-chan-seen { color: var(--yt-spec-text-secondary, #aaa); padding-left: 0; }
   `
 
   // ----------------------------- UTILITIES -----------------------------
   const utils = {
     isVideosTab: () => /\/videos\/?$/.test(location.pathname),
+
+    isChannelsFeed: () => location.pathname === "/feed/channels",
 
     currentVideoId: () => new URLSearchParams(location.search).get("v"),
   }
@@ -160,6 +180,96 @@
       }
       row.append(span)
       state.hasBadges = true
+    },
+  }
+
+  // ----------------------------- CHANNEL CHECK -----------------------------
+  // On /feed/channels, tags each subscribed channel as "New video" when its newest video has no
+  // mark. The newest video comes from the channel's /videos page (fetched, then cached).
+  const channelCheck = {
+    handleOf(row) {
+      const href = row.querySelector("a#main-link")?.getAttribute("href") || ""
+      return href.match(/^\/(@[^/?#]+)/)?.[1] || null
+    },
+
+    // Id of the first video in the /videos grid (newest first), or null if it can't be found
+    async fetchLatest(handle) {
+      try {
+        const res = await fetch(`/${handle}/videos`, { credentials: "include" })
+        if (!res.ok) return null
+        const json = (await res.text()).match(/var ytInitialData\s*=\s*(\{[\s\S]*?\});<\/script>/)
+        if (!json) return null
+        const tabs = JSON.parse(json[1]).contents.twoColumnBrowseResultsRenderer.tabs
+        const grid = tabs.find((tab) => tab.tabRenderer?.selected).tabRenderer.content.richGridRenderer
+        const first = grid.contents.find((item) => item.richItemRenderer)
+        const id = first.richItemRenderer.content.lockupViewModel.contentId
+        return /^[\w-]{11}$/.test(id) ? id : null
+      } catch {
+        return null
+      }
+    },
+
+    async latestFor(handle) {
+      const key = LATEST_PREFIX + handle
+      const cached = (await chrome.storage.local.get(key))[key]
+      if (cached && Date.now() - cached.at < preferences.channelCacheMs) return cached.id
+      const id = await channelCheck.fetchLatest(handle)
+      if (id) await chrome.storage.local.set({ [key]: { id, at: Date.now() } })
+      return id ?? cached?.id ?? null
+    },
+
+    pump() {
+      const channels = state.channels
+      while (channels.active < preferences.channelConcurrency && channels.queue.length) {
+        const handle = channels.queue.shift()
+        channels.active++
+        channelCheck
+          .latestFor(handle)
+          .then((id) => id && channels.latest.set(handle, id))
+          .finally(() => {
+            channels.active--
+            scanner.schedule()
+            channelCheck.pump()
+          })
+      }
+    },
+
+    reset() {
+      const channels = state.channels
+      channels.latest.clear()
+      channels.requested.clear()
+      channels.queue.length = 0
+    },
+
+    render(row, handle) {
+      const section = row.querySelector("#info-section")
+      if (!section) return
+      const id = state.channels.latest.get(handle)
+      const want = id ? (state.marks.has(id) ? "seen" : "new") : null
+      const existing = section.querySelector("[data-ytwm-chan]")
+      if (existing?.dataset.ytwmChan === want) return
+      existing?.remove()
+      if (!want) return
+
+      const badge = document.createElement("span")
+      badge.className = `ytwm-chan ytwm-chan-${want}`
+      badge.dataset.ytwmChan = want
+      badge.textContent = want === "new" ? "● New video" : "✓ Up to date"
+      section.append(badge)
+      state.hasBadges = true
+    },
+
+    scan() {
+      document.querySelectorAll(SELECTORS.channelRow).forEach((row) => {
+        const handle = channelCheck.handleOf(row)
+        if (!handle) return
+        if (!state.channels.requested.has(handle)) {
+          state.channels.requested.add(handle)
+          state.channels.queue.push(handle)
+          channelCheck.pump()
+        }
+        channelCheck.render(row, handle)
+      })
     },
   }
 
@@ -295,8 +405,12 @@
       playerMenu.injectStyles()
       playerMenu.injectButton()
 
+      const onChannelsFeed = utils.isChannelsFeed()
+      if (onChannelsFeed) channelCheck.scan()
+      else if (state.channels.requested.size) channelCheck.reset()
+
       if (!utils.isVideosTab()) {
-        if (state.hasBadges) {
+        if (state.hasBadges && !onChannelsFeed) {
           badges.clear(document)
           state.hasBadges = false
         }
@@ -335,13 +449,36 @@
       scanner.schedule()
     },
 
-    // Open the menu when the video finishes, since YouTube hides the player controls then.
+    // When the video finishes, mark it watched and open the menu (YouTube hides the player
+    // controls then), so the mark can still be cleared. Saved timestamps are overwritten.
     // "ended" doesn't bubble, so this is registered in the capture phase.
-    handleVideoEnded: (e) => {
+    handleVideoEnded: async (e) => {
       if (!(e.target instanceof HTMLVideoElement)) return
-      if (!location.pathname.startsWith("/watch") || state.menu) return
+      if (!location.pathname.startsWith("/watch")) return
+      if (!e.target.closest("#movie_player")) return // not the main player (e.g. a preview)
+      if (document.querySelector("#movie_player.ad-showing")) return // ads fire "ended" too
+      const id = utils.currentVideoId()
+      if (!id) return
+
+      let autoMarked = false
+      if (state.marks.get(id)?.s !== "w" && !state.marking.has(id)) {
+        state.marking.add(id) // a repeated "ended" must not re-run while the save is pending
+        const result = await applyAction("w", id, async () => ({})).finally(() => {
+          state.marking.delete(id)
+        })
+        savedMarks.update(id, result.mark)
+        scanner.schedule()
+        autoMarked = true
+      }
+      if (utils.currentVideoId() !== id) return // navigated away while saving
+
       playerMenu.injectButton()
-      playerMenu.create()
+      if (state.menu) playerMenu.paint()
+      else playerMenu.create()
+      if (autoMarked && state.menu?.id === id) {
+        playerMenu.flash("✓ Auto-marked watched")
+        playerMenu.paint()
+      }
     },
 
     handleNavigation: () => {

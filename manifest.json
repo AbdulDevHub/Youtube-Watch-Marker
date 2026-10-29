@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Watch Marker",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Mark YouTube videos as watched or save a timestamp, shown on channel Videos tabs. Stored locally.",
   "permissions": ["storage", "scripting"],
   "host_permissions": ["https://www.youtube.com/*"],

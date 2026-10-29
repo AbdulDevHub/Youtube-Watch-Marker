@@ -8,7 +8,8 @@ proactively, without being asked.
 ## Overview
 
 Manifest V3 Chrome extension. Marks YouTube videos as watched or saves a timestamp, stored locally.
-Shows badges on channel `/videos` tabs and an in-player menu on watch pages.
+Shows badges on channel `/videos` tabs and an in-player menu on watch pages. Videos that end are
+auto-marked watched; `/feed/channels` shows a "New video" badge per channel.
 
 ## Tech stack
 
@@ -24,9 +25,11 @@ Permissions: `storage`, `scripting`; host `https://www.youtube.com/*`.
 ## Architecture
 
 - `scripts/shared.js`: global `YTWM` (storage, labels, icons, `applyAction`). Loaded by the content script, and by the popup via script tag.
-- `scripts/content.js`: badges on /videos cards, the player button and menu on /watch.
+- `scripts/content.js`: badges on /videos cards, the player button and menu on /watch, auto-mark on `ended`, and `channelCheck` (new-video badges on /feed/channels).
 - `popup/`: toolbar popup (mark, saved list, import/export).
 - Marks live in `chrome.storage.local` as `v:<videoId>` -> `{ s: "w", at }` or `{ s: "t", t, at }`.
+- `channelCheck` fetches `/@handle/videos`, reads the first grid item's `contentId` from `ytInitialData`, and caches it as `latest:<@handle>` -> `{ id, at }` for 24h. Badges are computed from `state.marks` at render time. The channel ID isn't readable from the DOM and the RSS feed 404s, so handles are the key. Export/import only touch `v:` keys.
+- The `ended` handler skips when `#movie_player` has `.ad-showing` (ads fire `ended` too).
 
 ## Conventions & constraints
 
