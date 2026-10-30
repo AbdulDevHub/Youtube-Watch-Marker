@@ -25,6 +25,8 @@ them into the "Earlier history" paragraph instead of deleting them.
 
 ## Session log
 
+- 2026-10-30 (later): Added an MIT `LICENSE` (Abdul Khan, 2026) with a License section in `README.md`; screenshots table is now 2x2 so the images render larger.
+
 - 2026-10-30: Added a Screenshots table to `README.md` (four images from `screenshots/`, including the toolbar popup) and listed the folder in its file structure.
 
 - 2026-10-29 (later): Owner confirmed auto-mark and the channel pills work. Player button now turns light green (`.ytwm-watched`, set by `playerMenu.paintButton`) when the video is watched. Channel pills are purple and absolutely positioned inside `#info-section` (a flex row), because as a flex item they pushed the Subscribed button left.

@@ -8,9 +8,11 @@ YouTube doesn't tell you which of a channel's videos you've already seen, especi
 
 ## Screenshots
 
-| Channel Videos tab | Subscriptions feed | In-player menu | Toolbar popup |
-| --- | --- | --- | --- |
-| ![Watched and timestamp badges on a channel's Videos tab](screenshots/Channel%20Videos.png) | ![New video and up-to-date pills on the subscriptions feed](screenshots/Subscribtion%20Feed.png) | ![The in-player menu open on a video](screenshots/Video%20Menu.png) | ![The toolbar popup](screenshots/Extension%20Popup.png) |
+| Channel Videos tab | Subscriptions feed |
+| --- | --- |
+| ![Watched and timestamp badges on a channel's Videos tab](screenshots/Channel%20Videos.png) | ![New video and up-to-date pills on the subscriptions feed](screenshots/Subscribtion%20Feed.png) |
+| **In-player menu** | **Toolbar popup** |
+| ![The in-player menu open on a video](screenshots/Video%20Menu.png) | ![The toolbar popup](screenshots/Extension%20Popup.png) |
 
 ## Features
 
@@ -51,6 +53,7 @@ YouTube Watch Marker/
 ├── scripts/
 │   └── content.js
 ├── .gitignore
+├── LICENSE
 ├── manifest.json
 └── README.md
 ```
@@ -60,3 +63,7 @@ YouTube Watch Marker/
 - **Storage:** Marks are stored locally in Chrome's extension storage (`chrome.storage.local`) keyed by YouTube video IDs (`v:<videoId>`).
 - **Content Script:** Detects video metadata rows on YouTube channel `/videos` tabs and injects matching badges using DOM mutations.
 - **Popup Interface:** Reads the active tab state to offer contextual actions (Mark Watched, Save Timestamp, Clear, or Export/Import).
+
+## License
+
+Released under the [MIT License](LICENSE).
