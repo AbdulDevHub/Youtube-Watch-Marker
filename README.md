@@ -6,6 +6,12 @@ A lightweight Chrome Extension (Manifest V3) that lets you mark YouTube videos a
 
 YouTube doesn't tell you which of a channel's videos you've already seen, especially for long videos you stop halfway. This extension fills that gap. While watching, you click a small check icon in the player (or use the toolbar popup) to mark the video as watched or remember where you stopped. Back on the channel's Videos tab, each marked video shows a small "Watched" or "Watched Till 12:34" label. When a video finishes, it is marked watched automatically and the menu pops up so you can undo that. On your subscriptions list (`/feed/channels`), each channel shows "New video" when its newest video has no mark, so you don't have to open every channel to check. Everything is stored locally in your browser, with nothing sent anywhere.
 
+## Screenshots
+
+| Channel Videos tab | Subscriptions feed | In-player menu | Toolbar popup |
+| --- | --- | --- | --- |
+| ![Watched and timestamp badges on a channel's Videos tab](screenshots/Channel%20Videos.png) | ![New video and up-to-date pills on the subscriptions feed](screenshots/Subscribtion%20Feed.png) | ![The in-player menu open on a video](screenshots/Video%20Menu.png) | ![The toolbar popup](screenshots/Extension%20Popup.png) |
+
 ## Features
 
 - **Mark as Watched:** Flag any YouTube video as watched with a single click.
@@ -33,6 +39,11 @@ YouTube Watch Marker/
 │   ├── icon16.png
 │   ├── icon48.png
 │   └── icon128.png
+├── screenshots/
+│   ├── Channel Videos.png
+│   ├── Extension Popup.png
+│   ├── Subscribtion Feed.png
+│   └── Video Menu.png
 ├── popup/
 │   ├── popup.html
 │   ├── popup.css

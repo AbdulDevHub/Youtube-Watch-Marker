@@ -25,6 +25,8 @@ them into the "Earlier history" paragraph instead of deleting them.
 
 ## Session log
 
+- 2026-10-30: Added a Screenshots table to `README.md` (four images from `screenshots/`, including the toolbar popup) and listed the folder in its file structure.
+
 - 2026-10-29 (later): Owner confirmed auto-mark and the channel pills work. Player button now turns light green (`.ytwm-watched`, set by `playerMenu.paintButton`) when the video is watched. Channel pills are purple and absolutely positioned inside `#info-section` (a flex row), because as a flex item they pushed the Subscribed button left.
 
 - 2026-10-29: Added auto-mark on video end and new-video badges on /feed/channels (`channelCheck` in `content.js`, 24h cache under `latest:<@handle>`). Parsing of `ytInitialData` was checked against @mkbhd; syntax-checked only, UI untouched by a browser run.
