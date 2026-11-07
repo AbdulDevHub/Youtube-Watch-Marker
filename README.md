@@ -1,10 +1,14 @@
-# YouTube Watch Marker
+# YouTube Watch Marker: Track Watched Videos and Resume Timestamps
 
-A lightweight Chrome Extension (Manifest V3) that lets you mark YouTube videos as watched or save your current timestamp directly from the popup player. Badges are displayed on channel **Videos** tabs to help you keep track of what you've seen.
+![YouTube Watch Marker: mark videos as watched or save where you stopped](assets/og-image.png)
+
+**YouTube Watch Marker** is a lightweight, privacy-friendly Chrome extension (Manifest V3) that shows which YouTube videos you've already watched. Mark a video as watched or save your timestamp from the player or toolbar popup, and see "Watched" / "Watched Till 12:34" badges on every channel's **Videos** tab. Clicking a timestamped video resumes right where you stopped. Everything stays in your browser.
+
+Keywords: YouTube watched videos, YouTube watch history tracker, resume YouTube video, save YouTube timestamp, mark as watched, Chrome extension.
 
 ## Project Overview
 
-YouTube doesn't tell you which of a channel's videos you've already seen, especially for long videos you stop halfway. This extension fills that gap. While watching, you click a small check icon in the player (or use the toolbar popup) to mark the video as watched or remember where you stopped. Back on the channel's Videos tab, each marked video shows a small "Watched" or "Watched Till 12:34" label. When a video finishes, it is marked watched automatically and the menu pops up so you can undo that. On your subscriptions list (`/feed/channels`), each channel shows "New video" when its newest video has no mark, so you don't have to open every channel to check. Everything is stored locally in your browser, with nothing sent anywhere.
+YouTube doesn't tell you which of a channel's videos you've already seen, especially for long videos you stop halfway. This extension fills that gap. While watching, you click a small check icon in the player (or use the toolbar popup) to mark the video as watched or remember where you stopped. Back on the channel's Videos tab, each marked video shows a small "Watched" or "Watched Till 12:34" label, and clicking a timestamped one resumes from that time. When a video finishes, it is marked watched automatically and the menu pops up so you can undo that. On your subscriptions list (`/feed/channels`), each channel shows "New video" when its newest video has no mark, so you don't have to open every channel to check. Everything is stored locally in your browser, with nothing sent anywhere.
 
 ## Screenshots
 
@@ -18,6 +22,7 @@ YouTube doesn't tell you which of a channel's videos you've already seen, especi
 
 - **Mark as Watched:** Flag any YouTube video as watched with a single click.
 - **Save Timestamps:** Save your current playback position (e.g., `⏱ 12:34`) to resume or reference later.
+- **Resume on Click:** Clicking a timestamped video on a channel's Videos tab opens it at the saved time, the same as the popup's saved list.
 - **Channel /Videos Integration:** Displays `✓ Watched` or timestamp badges alongside video metadata on channel pages.
 - **Import / Export:** Backup or transfer your saved history as a JSON file across browsers or devices.
 - **In-Player Menu:** A check icon in the player's top-right opens a quick menu; it opens automatically when a video ends.
@@ -40,7 +45,8 @@ YouTube Watch Marker/
 ├── assets/
 │   ├── icon16.png
 │   ├── icon48.png
-│   └── icon128.png
+│   ├── icon128.png
+│   └── og-image.png
 ├── screenshots/
 │   ├── Channel Videos.png
 │   ├── Extension Popup.png
@@ -51,7 +57,8 @@ YouTube Watch Marker/
 │   ├── popup.css
 │   └── popup.js
 ├── scripts/
-│   └── content.js
+│   ├── content.js
+│   └── shared.js
 ├── .gitignore
 ├── LICENSE
 ├── manifest.json

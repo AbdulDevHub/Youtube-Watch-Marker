@@ -29,6 +29,7 @@ Permissions: `storage`, `scripting`; host `https://www.youtube.com/*`.
 - `popup/`: toolbar popup (mark, saved list, import/export).
 - Marks live in `chrome.storage.local` as `v:<videoId>` -> `{ s: "w", at }` or `{ s: "t", t, at }`.
 - `channelCheck` fetches `/@handle/videos`, reads the first grid item's `contentId` from `ytInitialData`, and caches it as `latest:<@handle>` -> `{ id, at }` for 24h. Badges are computed from `state.marks` at render time. The channel ID isn't readable from the DOM and the RSS feed 404s, so handles are the key. Export/import only touch `v:` keys.
+- `badges.resumeLinks` rewrites a timestamped card's watch links to `&t=<s>s` (restored when the mark is cleared), so clicking it on /videos resumes like the popup list.
 - The `ended` handler skips when `#movie_player` has `.ad-showing` (ads fire `ended` too).
 
 ## Conventions & constraints

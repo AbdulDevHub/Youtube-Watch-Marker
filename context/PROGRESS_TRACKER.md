@@ -13,10 +13,13 @@ them into the "Earlier history" paragraph instead of deleting them.
 - When a video ends, it is auto-marked watched (overwriting a saved timestamp), the player menu opens automatically and the player button stays visible and correctly placed.
 - `/feed/channels` shows "● New video" / "✓ Up to date" per channel, from each channel's latest video (cached 24h).
 - The player button turns light green while the current video is marked watched.
+- Clicking a timestamped video on a /videos tab resumes at the saved time (links get `&t=Ns`).
+- Repo SEO: keyworded README title/intro, GitHub description and topics, `assets/og-image.png` (1280x640).
 - Version 1.2.0.
 
 ## In progress
 
+- Owner to upload `assets/og-image.png` as the repo social preview (GitHub Settings > Social preview; no API for it) and to try the resume-on-click in a browser.
 - Owner to reload the extension and confirm the green player icon (not yet seen in a browser).
 
 ## Next steps
@@ -24,6 +27,8 @@ them into the "Earlier history" paragraph instead of deleting them.
 - Verify an ad ending doesn't auto-mark.
 
 ## Session log
+
+- 2026-11-06: Resume-on-click for timestamped cards on /videos (`badges.resumeLinks`, syntax-checked only). GitHub SEO: README title and intro, repo description and topics, OG image.
 
 - 2026-10-30 (later): Added an MIT `LICENSE` (Abdul Khan, 2026) with a License section in `README.md`; screenshots table is now 2x2 so the images render larger.
 

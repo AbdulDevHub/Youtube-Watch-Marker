@@ -148,13 +148,39 @@
       root.querySelectorAll(SELECTORS.badge).forEach((node) => node.remove())
     },
 
+    // Point the card's watch links at the saved timestamp (&t=Ns), like the popup list does, so
+    // clicking (or middle-clicking) a card resumes there. Links are restored when the mark goes.
+    resumeLinks(card, mark) {
+      const seconds = mark?.s === "t" ? Math.floor(mark.t) : null
+      card.querySelectorAll('a[href*="/watch?v="]').forEach((link) => {
+        try {
+          const url = new URL(link.getAttribute("href"), location.origin)
+          if (seconds) {
+            if (url.searchParams.get("t") === `${seconds}s`) return
+            url.searchParams.set("t", `${seconds}s`)
+            link.dataset.ytwmResume = "1"
+          } else if (link.dataset.ytwmResume) {
+            url.searchParams.delete("t")
+            delete link.dataset.ytwmResume
+          } else {
+            return
+          }
+          link.setAttribute("href", url.pathname + url.search)
+        } catch {
+          // malformed href: leave it alone
+        }
+      })
+    },
+
     render(card) {
+      const id = badges.videoIdOf(card)
+      const mark = id ? state.marks.get(id) : null
+      badges.resumeLinks(card, mark)
+
       const rows = card.querySelectorAll(SELECTORS.row)
       const row = rows[rows.length - 1] // views/date row is the last metadata row
       if (!row) return
 
-      const id = badges.videoIdOf(card)
-      const mark = id ? state.marks.get(id) : null
       const want = mark ? label(mark, true) : null
 
       const existing = row.querySelector("[data-ytwm]")
