@@ -8,7 +8,7 @@ Keywords: YouTube watched videos, YouTube watch history tracker, resume YouTube 
 
 ## Project Overview
 
-YouTube doesn't tell you which of a channel's videos you've already seen, especially for long videos you stop halfway. This extension fills that gap. While watching, you click a small check icon in the player (or use the toolbar popup) to mark the video as watched or remember where you stopped. Back on the channel's Videos tab, each marked video shows a small "Watched" or "Watched Till 12:34" label, and clicking a timestamped one resumes from that time. When a video finishes, it is marked watched automatically and the menu pops up so you can undo that. On your subscriptions list (`/feed/channels`), each channel shows "New video" when its newest video has no mark, so you don't have to open every channel to check. Everything is stored locally in your browser, with nothing sent anywhere.
+YouTube doesn't tell you which of a channel's videos you've already seen, especially for long videos you stop halfway. This extension fills that gap. While watching, you click a small check icon in the player (or use the toolbar popup) to mark the video as watched or remember where you stopped. Back on the channel's Videos tab, each marked video shows a small "Watched" or "Watched Till 12:34" label, and clicking a timestamped one resumes from that time. When a video finishes, it is marked watched automatically and the menu pops up so you can undo that. On your subscriptions list (`/feed/channels`), each channel shows "New video" when its newest video has no mark, so you don't have to open every channel to check. Your saved timestamps also fill the main area of your watch history page (`/feed/history`), so you can pick up where you left off without opening the extension. Everything is stored locally in your browser, with nothing sent anywhere.
 
 ## Screenshots
 
@@ -17,6 +17,10 @@ YouTube doesn't tell you which of a channel's videos you've already seen, especi
 | ![Watched and timestamp badges on a channel's Videos tab](screenshots/Channel%20Videos.png) | ![New video and up-to-date pills on the subscriptions feed](screenshots/Subscribtion%20Feed.png) |
 | **In-player menu** | **Toolbar popup** |
 | ![The in-player menu open on a video](screenshots/Video%20Menu.png) | ![The toolbar popup](screenshots/Extension%20Popup.png) |
+
+**Saved timestamps on the watch history page**
+
+![Saved timestamps shown as video cards on the watch history page](screenshots/Watch%20History.png)
 
 ## Features
 
@@ -29,6 +33,7 @@ YouTube doesn't tell you which of a channel's videos you've already seen, especi
 - **Green Check:** The player's check icon turns light green when the video is marked watched, so you can tell without opening the menu.
 - **Auto-Mark on End:** A video that plays to the end is marked watched (replacing a saved timestamp). The menu stays open so you can clear it.
 - **New-Video Badges:** On `/feed/channels`, each channel shows a purple `● New video` pill or a muted `✓ Up to date`, based on whether its latest video is marked. Results are cached for 24 hours.
+- **Saved Timestamps on History:** `/feed/history` shows your saved timestamps as a grid of video cards (thumbnail, title, resume time); click one to resume, or use the trash icon to remove it.
 - **Clean UI:** Contextual popup interface that dynamically updates based on whether you're viewing a video or browsing a channel.
 
 ## Installation

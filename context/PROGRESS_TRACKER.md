@@ -14,6 +14,7 @@ them into the "Earlier history" paragraph instead of deleting them.
 - `/feed/channels` shows "● New video" / "✓ Up to date" per channel, from each channel's latest video (cached 24h).
 - The player button turns light green while the current video is marked watched.
 - Clicking a timestamped video on a /videos tab resumes at the saved time (links get `&t=Ns`).
+- `/feed/history` shows a "Saved timestamps" card grid (thumbnail with time badge, title, resume time, hover remove button) in the main column; YouTube's empty-history message is hidden.
 - Repo SEO: keyworded README title/intro, GitHub description and topics, `assets/og-image.png` (1280x640).
 - Version 1.2.0.
 
@@ -27,6 +28,8 @@ them into the "Earlier history" paragraph instead of deleting them.
 - Verify an ad ending doesn't auto-mark.
 
 ## Session log
+
+- 2026-11-06 (later): Saved-timestamps panel on /feed/history (`historyPanel` in `content.js`), so the list is reachable with the extension unpinned. Title fetch and list sorting moved to `shared.js` for reuse by the popup. First placed in the right sidebar; the owner wanted it in the empty main column (they keep watch history off), so it is now a card grid there and YouTube's "no videos" message is hidden. Checked in the owner's Chrome with 4 saved videos; remove button not clicked. Added `screenshots/Watch History.png` to the README.
 
 - 2026-11-06: Resume-on-click for timestamped cards on /videos (`badges.resumeLinks`, syntax-checked only). GitHub SEO: README title and intro, repo description and topics, OG image.
 

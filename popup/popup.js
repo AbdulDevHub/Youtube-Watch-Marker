@@ -100,29 +100,8 @@
 
   // ----------------------------- SAVED TIMESTAMPS -----------------------------
   const saved = {
-    titleKey: (id) => "title:" + id,
-
-    async title(id) {
-      const key = saved.titleKey(id)
-      const cached = (await chrome.storage.local.get(key))[key]
-      if (cached) return cached
-      try {
-        const url = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`
-        const res = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`)
-        if (!res.ok) return null
-        const title = (await res.json()).title
-        if (title) await chrome.storage.local.set({ [key]: title })
-        return title || null
-      } catch {
-        return null
-      }
-    },
-
     async list() {
-      const marks = await loadAll()
-      return [...marks]
-        .filter(([, mark]) => mark && mark.s === "t")
-        .sort((a, b) => (b[1].at || 0) - (a[1].at || 0))
+      return YTWM.savedTimestamps(await loadAll())
     },
 
     async refreshCount() {
@@ -159,7 +138,7 @@
         })
         li.append(link)
         elements.savedList.append(li)
-        saved.title(id).then((text) => {
+        YTWM.loadTitle(id).then((text) => {
           title.textContent = text || id
         })
       }

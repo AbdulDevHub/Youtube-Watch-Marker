@@ -5,7 +5,8 @@
   "use strict"
 
   // ----------------------------- GLOBAL VARIABLES -----------------------------
-  const { PREFIX, label, describe, ACTIONS, icon, loadAll, readPlayerTime, applyAction } = YTWM
+  const { PREFIX, label, describe, ACTIONS, icon, fmt, loadAll, readPlayerTime, applyAction } = YTWM
+  const { savedTimestamps, loadTitle } = YTWM
 
   const preferences = {
     scanDelayMs: 100, // debounce between DOM changes and a re-scan
@@ -20,6 +21,7 @@
     hasBadges: false, // true if badges were injected and need cleanup when leaving their page
     menu: null, // { el, id, status, flash, flashTimer } while the player menu is open
     marking: new Set(), // video ids with an auto-mark save in flight
+    titles: new Map(), // videoId -> title, for the history panel
     channels: {
       latest: new Map(), // "@handle" -> id of the channel's newest video
       requested: new Set(), // handles already queued during this visit to /feed/channels
@@ -31,6 +33,7 @@
   // No cached `elements`: YouTube rebuilds its DOM on navigation, so lookups stay on demand
   const BUTTON_ID = "ytwm-player-btn"
   const STYLE_ID = "ytwm-style"
+  const PANEL_ID = "ytwm-history-panel"
   const LATEST_PREFIX = "latest:" // storage key: latest:<@handle> -> { id, at }
 
   const SELECTORS = {
@@ -40,6 +43,7 @@
     delimiter: ".ytContentMetadataViewModelDelimiter",
     badge: "[data-ytwm], [data-ytwm-sep], [data-ytwm-chan]",
     channelRow: "ytd-channel-renderer",
+    historyMain: 'ytd-browse[page-subtype="history"] #primary',
   }
 
   const STYLES = `
@@ -112,6 +116,52 @@
     }
     .ytwm-chan-new { background: #8b5cf6; color: #fff; }
     .ytwm-chan-seen { color: var(--yt-spec-text-secondary, #aaa); padding-left: 0; }
+
+    /* Main column of /feed/history: a grid of cards styled like YouTube's own video grid */
+    #${PANEL_ID} {
+      margin: 24px 0 32px;
+      color: var(--yt-spec-text-primary, #f1f1f1); font: 400 14px/1.4 Roboto, Arial, sans-serif;
+    }
+    #${PANEL_ID} h2 {
+      display: flex; align-items: center; gap: 10px; margin: 0 0 16px;
+      font: 700 20px/28px Roboto, Arial, sans-serif;
+    }
+    #${PANEL_ID} h2 svg { width: 24px; height: 24px; }
+    #${PANEL_ID} .ytwm-count {
+      padding: 0 8px; border-radius: 10px; background: #8b5cf6; color: #fff;
+      font: 500 13px/20px Roboto, Arial, sans-serif;
+    }
+    #${PANEL_ID} ul {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px 16px;
+      list-style: none; margin: 0; padding: 0;
+    }
+    #${PANEL_ID} li { position: relative; min-width: 0; }
+    #${PANEL_ID} a { display: flex; flex-direction: column; gap: 10px; color: inherit; text-decoration: none; }
+    #${PANEL_ID} .ytwm-thumb {
+      position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000;
+    }
+    #${PANEL_ID} img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+    #${PANEL_ID} a:hover img { transform: scale(1.03); }
+    #${PANEL_ID} .ytwm-time {
+      position: absolute; right: 8px; bottom: 8px; padding: 2px 6px; border-radius: 6px;
+      background: rgba(0, 0, 0, 0.8); color: #fff; font: 500 12px/18px Roboto, Arial, sans-serif;
+    }
+    #${PANEL_ID} .ytwm-title {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+      font: 500 16px/22px Roboto, Arial, sans-serif;
+    }
+    #${PANEL_ID} .ytwm-at { margin-top: -6px; color: var(--yt-spec-text-secondary, #aaa); }
+    #${PANEL_ID} .ytwm-remove {
+      position: absolute; top: 8px; right: 8px; display: grid; place-items: center;
+      width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+      background: rgba(0, 0, 0, 0.75); color: #fff; opacity: 0; transition: opacity 0.12s;
+    }
+    #${PANEL_ID} li:hover .ytwm-remove, #${PANEL_ID} .ytwm-remove:focus-visible { opacity: 1; }
+    #${PANEL_ID} .ytwm-remove:hover { background: #cc2b2b; }
+    #${PANEL_ID} .ytwm-remove svg { width: 18px; height: 18px; }
+    #${PANEL_ID} .ytwm-none { color: var(--yt-spec-text-secondary, #aaa); }
+    /* Hide YouTube's "This list has no videos." (watch history off) below the saved grid */
+    #primary:has(> #${PANEL_ID}) ytd-item-section-renderer ytd-message-renderer { display: none; }
   `
 
   // ----------------------------- UTILITIES -----------------------------
@@ -119,6 +169,8 @@
     isVideosTab: () => /\/videos\/?$/.test(location.pathname),
 
     isChannelsFeed: () => location.pathname === "/feed/channels",
+
+    isHistoryFeed: () => location.pathname === "/feed/history",
 
     currentVideoId: () => new URLSearchParams(location.search).get("v"),
   }
@@ -302,6 +354,96 @@
     },
   }
 
+  // ----------------------------- HISTORY PANEL -----------------------------
+  // On /feed/history, shows saved timestamps as a grid atop the main column (same list as the
+  // popup), so they can be reached without pinning the extension.
+  const historyPanel = {
+    remove() {
+      document.getElementById(PANEL_ID)?.remove()
+    },
+
+    item(id, mark) {
+      const li = document.createElement("li")
+      const link = document.createElement("a")
+      link.href = `/watch?v=${encodeURIComponent(id)}&t=${mark.t}s`
+      const thumb = document.createElement("img")
+      thumb.src = `https://i.ytimg.com/vi/${encodeURIComponent(id)}/mqdefault.jpg`
+      thumb.alt = ""
+      thumb.loading = "lazy"
+      const frame = document.createElement("span")
+      frame.className = "ytwm-thumb"
+      const time = document.createElement("span")
+      time.className = "ytwm-time"
+      time.textContent = `⏱ ${fmt(mark.t)}`
+      frame.append(thumb, time)
+      const title = document.createElement("span")
+      title.className = "ytwm-title"
+      title.textContent = state.titles.get(id) || "Loading…"
+      const at = document.createElement("span")
+      at.className = "ytwm-at"
+      at.textContent = `Resume at ${fmt(mark.t)}`
+      link.append(frame, title, at)
+
+      const remove = document.createElement("button")
+      remove.type = "button"
+      remove.className = "ytwm-remove"
+      remove.title = "Remove saved timestamp"
+      remove.setAttribute("aria-label", "Remove saved timestamp")
+      remove.innerHTML = icon("trash")
+      remove.addEventListener("click", async () => {
+        const result = await applyAction("clear", id, async () => ({}))
+        savedMarks.update(id, result.mark)
+        scanner.schedule()
+      })
+      li.append(link, remove)
+
+      if (!state.titles.has(id)) {
+        loadTitle(id).then((text) => {
+          if (text) state.titles.set(id, text)
+          title.textContent = text || id
+        })
+      }
+      return li
+    },
+
+    // Re-renders only when the saved list changes; the scanner calls this on every DOM change
+    render() {
+      const main = document.querySelector(SELECTORS.historyMain)
+      if (!main) return
+      const items = savedTimestamps(state.marks)
+      const signature = items.map(([id, mark]) => `${id}@${mark.t}`).join(",")
+
+      let panel = document.getElementById(PANEL_ID)
+      if (panel?.parentElement === main && panel.dataset.sig === signature) return
+      if (!panel || panel.parentElement !== main) {
+        panel?.remove()
+        panel = document.createElement("section")
+        panel.id = PANEL_ID
+        main.prepend(panel)
+      }
+      panel.dataset.sig = signature
+
+      const heading = document.createElement("h2")
+      heading.innerHTML = `${icon("clock")}<span>Saved timestamps</span>`
+      if (items.length) {
+        const count = document.createElement("span")
+        count.className = "ytwm-count"
+        count.textContent = items.length
+        heading.append(count)
+      }
+      const list = document.createElement("ul")
+      if (items.length) {
+        items.forEach(([id, mark]) => list.append(historyPanel.item(id, mark)))
+      } else {
+        const none = document.createElement("li")
+        none.className = "ytwm-none"
+        none.textContent = "No saved timestamps yet."
+        list.append(none)
+      }
+      panel.replaceChildren(heading, list)
+    },
+  }
+
   // ----------------------------- PLAYER MENU -----------------------------
   const playerMenu = {
     injectStyles() {
@@ -444,6 +586,9 @@
       const onChannelsFeed = utils.isChannelsFeed()
       if (onChannelsFeed) channelCheck.scan()
       else if (state.channels.requested.size) channelCheck.reset()
+
+      if (utils.isHistoryFeed()) historyPanel.render()
+      else historyPanel.remove()
 
       if (!utils.isVideosTab()) {
         if (state.hasBadges && !onChannelsFeed) {

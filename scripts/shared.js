@@ -85,6 +85,32 @@
     removeMark(id) {
       return chrome.storage.local.remove(utils.keyOf(id))
     },
+
+    // Saved timestamps as [id, mark] pairs, newest first
+    savedTimestamps(marks) {
+      return [...marks]
+        .filter(([, mark]) => mark && mark.s === "t")
+        .sort((a, b) => (b[1].at || 0) - (a[1].at || 0))
+    },
+
+    // Video title via oEmbed, cached in storage as "title:<id>"
+    async loadTitle(id) {
+      const key = "title:" + id
+      const cached = (await chrome.storage.local.get(key))[key]
+      if (cached) return cached
+      try {
+        const url = `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`
+        const res = await fetch(
+          `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url)}`
+        )
+        if (!res.ok) return null
+        const title = (await res.json()).title
+        if (title) await chrome.storage.local.set({ [key]: title })
+        return title || null
+      } catch {
+        return null
+      }
+    },
   }
 
   // ----------------------------- PLAYER -----------------------------
@@ -138,6 +164,8 @@
     loadAll: storage.loadAll,
     saveMark: storage.saveMark,
     removeMark: storage.removeMark,
+    savedTimestamps: storage.savedTimestamps,
+    loadTitle: storage.loadTitle,
     readPlayerTime,
     applyAction: actions.applyAction,
   }
